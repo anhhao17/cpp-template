@@ -198,14 +198,6 @@ Status SendPutKey(Connection &conn, const Scp03KeySet &new_keys) {
 
 } // namespace
 
-// --- Scp03Admin ---
-
-Result<Scp03Admin> Scp03Admin::Open(const char *port) {
-    auto res = Connection::Open(port, /*select_applet=*/false);
-    if (!res) return Unexpected<>{res.error()};
-    return Scp03Admin(std::move(res.value()));
-}
-
 Status Scp03Admin::Rotate(const Scp03KeySet &new_keys, bool dry_run, const char *key_file) {
     // If we need to wrap the new keys we must first load the current DEK.
     if (!dry_run) {

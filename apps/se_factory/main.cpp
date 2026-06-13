@@ -124,18 +124,18 @@ static int CmdReadInfo(Connection &conn) {
 }
 
 static int CmdRotateScp03(const char *port, const char *newkeys_path, bool dry_run) {
-    auto admin_res = Scp03Admin::Open(port);
-    if (!admin_res) {
-        ETLX_LOG_ERROR("rotate-scp03: open: %s", admin_res.error().message.c_str());
+    auto conn_res = Connection::Open(port, /*select_applet=*/false);
+    if (!conn_res) {
+        ETLX_LOG_ERROR("rotate-scp03: open: %s", conn_res.error().message.c_str());
         return 1;
     }
+    Scp03Admin admin(std::move(conn_res.value()));
     auto new_keys_res = scp03_keyfile::Read(newkeys_path);
     if (!new_keys_res) {
         ETLX_LOG_ERROR("rotate-scp03: %s", new_keys_res.error().message.c_str());
         return 1;
     }
-    auto st = admin_res.value().Rotate(new_keys_res.value(), dry_run,
-                                        dry_run ? nullptr : newkeys_path);
+    auto st = admin.Rotate(new_keys_res.value(), dry_run, dry_run ? nullptr : newkeys_path);
     if (!st) { ETLX_LOG_ERROR("rotate-scp03: %s", st.error().message.c_str()); return 1; }
     return 0;
 }

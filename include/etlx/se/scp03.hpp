@@ -42,8 +42,8 @@ Status Write(const char *path, const Scp03KeySet &keys);
 // key_file path) before closing the current session.
 class Scp03Admin {
 public:
-    // Open a connection targeting the ISD (skip_select_applet=1).
-    static Result<Scp03Admin> Open(const char *port);
+    // Construct from an ISD connection: Connection::Open(port, /*select_applet=*/false).
+    explicit Scp03Admin(Connection &&c) : conn_(std::move(c)) {}
 
     // Install newKeys.  If key_file is non-null and dry_run is false, atomically
     // writes the new key set to the file on success.
@@ -55,7 +55,6 @@ public:
     Scp03Admin &operator=(const Scp03Admin &) = delete;
 
 private:
-    explicit Scp03Admin(Connection &&c) : conn_(std::move(c)) {}
     Connection conn_;
 };
 

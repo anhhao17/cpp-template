@@ -7,7 +7,6 @@ on:
     branches: [ main ]
 
 jobs:
-  # ── native (host): full build + test suite ─────────────────────────────────
   native:
     name: native (${{ matrix.preset }})
     runs-on: ubuntu-latest
@@ -26,9 +25,56 @@ jobs:
       - name: Test
         run: ctest --preset ${{ matrix.preset }} --output-on-failure
 
-  # ── SE05x port: build + test (hardware tests skip; compile verified) ─────
+  # ── SE05x + wolfSSL software simulator (full integration tests) ────────────
+  se05x-sim:
+    name: SE05x simulator tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get install -y cmake ninja-build
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            simulators/SE050Sim/se050-sim/target
+          key: ${{ runner.os }}-se050-sim-${{ hashFiles('simulators/SE050Sim/se050-sim/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-se050-sim-
+      - name: Clone wolfSSL SE050 simulator
+        run: |
+          git clone --depth 1 https://github.com/wolfSSL/simulators simulators
+      - name: Build tcp_server
+        run: |
+          cd simulators/SE050Sim/se050-sim
+          cargo build --release --bin tcp_server
+      - name: Start simulator in background
+        run: |
+          simulators/SE050Sim/se050-sim/target/release/tcp_server &
+          echo "SIM_PID=$!" >> $GITHUB_ENV
+          # Wait until port 8050 is accepting connections (up to 10s).
+          for i in $(seq 1 20); do
+            nc -z 127.0.0.1 8050 2>/dev/null && echo "Simulator ready" && break
+            sleep 0.5
+          done
+      - name: Configure (sim transport, tests ON)
+        run: cmake --preset se05x-sim
+      - name: Build
+        run: cmake --build build/se05x-sim
+      - name: Run SE integration tests against simulator
+        env:
+          EX_SSS_BOOT_SSS_PORT: "127.0.0.1:8050"
+        run: ctest --preset se05x-sim --output-on-failure
+      - name: Stop simulator
+        if: always()
+        run: kill $SIM_PID 2>/dev/null || true
+
+  # ── SE05x port: compile check (socket preset, no hardware/simulator) ──────
   se05x-build:
-    name: SE05x build + tests (socket preset, no hardware)
+    name: SE05x compile check (socket)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

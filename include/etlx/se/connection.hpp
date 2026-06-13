@@ -57,6 +57,8 @@ public:
     Connection(Connection &&o) noexcept : ctx_(o.ctx_), opened_(o.opened_) {
         o.opened_ = false;
         std::memset(&o.ctx_, 0, sizeof(o.ctx_));
+        if (ctx_.ks.session != nullptr)
+            ctx_.ks.session = &ctx_.session;
     }
 
     Connection &operator=(Connection &&) = delete;

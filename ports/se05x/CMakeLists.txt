@@ -15,10 +15,13 @@ set(SIMW_LIB_DIR ${plugandtrust_SOURCE_DIR})
 # i2c    (default): T1oI2C — direct Linux I2C bus (/dev/i2c-*), real hardware.
 # socket: JRCP V1 over TCP — NXP's GenericJRCPServer simulator or VCOM bridge.
 #         Set EX_SSS_BOOT_SSS_PORT=127.0.0.1:8050 (or your bridge address).
-set(ETLX_SE05X_TRANSPORT "i2c" CACHE STRING "SE05x transport: i2c or socket")
-set_property(CACHE ETLX_SE05X_TRANSPORT PROPERTY STRINGS i2c socket)
-if(NOT ETLX_SE05X_TRANSPORT MATCHES "^(i2c|socket)$")
-  message(FATAL_ERROR "ETLX_SE05X_TRANSPORT must be 'i2c' or 'socket'")
+# sim:    T1oI2C with TCP I2C PAL — wolfSSL SE050 software simulator.
+#         Build simulator: https://github.com/wolfSSL/simulators/tree/main/SE050Sim
+#         Set EX_SSS_BOOT_SSS_PORT=127.0.0.1:8050 before running tests.
+set(ETLX_SE05X_TRANSPORT "i2c" CACHE STRING "SE05x transport: i2c, socket, or sim")
+set_property(CACHE ETLX_SE05X_TRANSPORT PROPERTY STRINGS i2c socket sim)
+if(NOT ETLX_SE05X_TRANSPORT MATCHES "^(i2c|socket|sim)$")
+  message(FATAL_ERROR "ETLX_SE05X_TRANSPORT must be 'i2c', 'socket', or 'sim'")
 endif()
 message(STATUS "etlx: SE05x transport = ${ETLX_SE05X_TRANSPORT}")
 
@@ -26,7 +29,12 @@ message(STATUS "etlx: SE05x transport = ${ETLX_SE05X_TRANSPORT}")
 set(PTMW_Applet     SE05X_C   CACHE STRING "" FORCE)
 set(PTMW_SE05X_Ver  07_02     CACHE STRING "" FORCE)  # 07_xx = SE051/SE052
 set(PTMW_HostCrypto MBEDTLS   CACHE STRING "" FORCE)
-set(PTMW_SE05X_Auth PlatfSCP03 CACHE STRING "" FORCE) # Platform SCP03 channel
+# wolfSSL simulator does not implement SCP03 — use plain auth for sim transport.
+if(ETLX_SE05X_TRANSPORT STREQUAL "sim")
+  set(PTMW_SE05X_Auth None CACHE STRING "" FORCE)
+else()
+  set(PTMW_SE05X_Auth PlatfSCP03 CACHE STRING "" FORCE)
+endif()
 
 # Select the mbedTLS 3.x API in the SSS sources (our mbedTLS is 3.6.6).
 set(SSS_HAVE_MBEDTLS_2_X 0)
@@ -73,6 +81,20 @@ if(ETLX_SE05X_TRANSPORT STREQUAL "socket")
   set(SIMW_INC_DIR "${SIMW_INC_DIR};${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+# Simulator transport: T1oI2C protocol stack, but I2C PAL replaced by a TCP
+# socket that connects to the wolfSSL SE050 software simulator (tcp_server).
+# EX_SSS_BOOT_SSS_PORT=127.0.0.1:8050 (parsed by i2c_sim.c).
+# See: https://github.com/wolfSSL/simulators/tree/main/SE050Sim
+if(ETLX_SE05X_TRANSPORT STREQUAL "sim")
+  # Replace the real I2C PAL and GPIO reset with simulator stubs.
+  list(REMOVE_ITEM SIMW_SE_SOURCES
+    ${SIMW_LIB_DIR}/hostlib/hostLib/platform/linux/i2c_a7.c
+    ${SIMW_LIB_DIR}/hostlib/hostLib/platform/rsp/se05x_reset.c)
+  list(APPEND SIMW_SE_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/i2c_sim.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/se05x_reset_stub.c)
+endif()
+
 add_library(etlx_simw STATIC ${SIMW_SE_SOURCES} ${SIMW_SE_AUTH_SOURCES})
 
 target_include_directories(etlx_simw SYSTEM PUBLIC
@@ -83,6 +105,21 @@ target_include_directories(etlx_simw SYSTEM PUBLIC
 # mbedTLS targets come from the fetched mbedtls (ETLX_WITH_TLS). SSS host-crypto
 # uses mbedcrypto/x509; tls is harmless to include.
 target_link_libraries(etlx_simw PUBLIC mbedtls mbedx509 mbedcrypto)
+
+# Propagate the transport-selection defines and SSS_USE_FTR_FILE as PUBLIC so
+# every consumer TU sees the same ex_sss_boot_ctx_t layout (ODR: the struct
+# is configurable via preprocessor, so all TUs that include NXP headers must
+# have identical defines or they will silently disagree on the struct size).
+# add_definitions() inside simw_lib.cmake is directory-scoped and does NOT
+# propagate to sibling directories (e.g. tests/), so we duplicate them here
+# as target-level PUBLIC definitions.
+if(ETLX_SE05X_TRANSPORT STREQUAL "socket")
+  target_compile_definitions(etlx_simw PUBLIC SSS_USE_FTR_FILE SMCOM_JRCP_V1=1)
+else()
+  # i2c and sim both use the T1oI2C protocol stack.
+  target_compile_definitions(etlx_simw PUBLIC
+    SSS_USE_FTR_FILE SMCOM_T1oI2C T1oI2C T1oI2C_UM11225)
+endif()
 
 # MBEDTLS_ALLOW_PRIVATE_ACCESS: inside the 3.x code paths, NXP accesses
 # mbedtls_ecp_keypair fields as ->grp / ->d / ->Q using the old names.  In

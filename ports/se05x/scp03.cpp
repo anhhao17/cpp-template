@@ -43,7 +43,6 @@ Status LoadCurrentDek(Connection &conn, const char *path) {
     if (!st)
         return st;
 
-    ex_sss_boot_ctx_t *ctx = conn.boot_ctx();
     NXSCP03_StaticCtx_t *sc = StaticCtx(conn);
     sc->key_len = kKeyLen;
     sss_status_t rc = sss_host_key_store_set_key(sc->Dek.keyStore, &sc->Dek, dek, kKeyLen,

@@ -23,8 +23,7 @@ namespace etlx::se {
 
 namespace {
 
-Status ApplyPolicy(Connection &conn, KeyObject &obj, uint32_t key_id, RsaBits bits,
-                   KeyPolicy policy) {
+Status ApplyPolicy(Connection &conn, KeyObject &obj, RsaBits bits, KeyPolicy policy) {
     if (policy == KeyPolicy::Full) {
         sss_status_t st =
             sss_key_store_generate_key(conn.keystore(), obj.raw(),
@@ -71,7 +70,7 @@ Result<RsaKey> RsaKey::Generate(Connection &conn, uint32_t key_id, RsaBits bits,
     if (!st)
         return SeFail(kKeyFailed, "key_object_allocate_handle failed");
 
-    auto gen_st = ApplyPolicy(conn, k.obj_, key_id, bits, policy);
+    auto gen_st = ApplyPolicy(conn, k.obj_, bits, policy);
     if (!gen_st)
         return Unexpected<>{gen_st.error()};
 
@@ -207,12 +206,16 @@ bool AssembleCsr(const uint8_t *cri, size_t cri_len,
                  const uint8_t *sig, size_t sig_len,
                  char *pem_out, size_t pem_capacity) {
     uint8_t buf[ETLX_SE_CSR_PEM_CAPACITY];
-    unsigned char *start = buf;
+    unsigned char * const start = buf;
     unsigned char *c = buf + sizeof(buf);
     int written = 0;
+#define CHKB(expr) do { int _r = (expr); if (_r < 0) return false; written += _r; } while (0)
 
-    CHK(mbedtls_asn1_write_bitstring(&c, start,
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+    CHKB(mbedtls_asn1_write_bitstring(&c, start,
         reinterpret_cast<const unsigned char *>(sig), sig_len * 8));
+#pragma GCC diagnostic pop
 
     // signatureAlgorithm: sha256WithRSAEncryption
     {
@@ -228,8 +231,9 @@ bool AssembleCsr(const uint8_t *cri, size_t cri_len,
     std::memcpy(c, cri, cri_len);
     written += static_cast<int>(cri_len);
 
-    CHK(mbedtls_asn1_write_len(&c, start, written));
-    CHK(mbedtls_asn1_write_tag(&c, start, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+    CHKB(mbedtls_asn1_write_len(&c, start, written));
+    CHKB(mbedtls_asn1_write_tag(&c, start, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+#undef CHKB
 
     size_t olen = 0;
     int r = mbedtls_pem_write_buffer(

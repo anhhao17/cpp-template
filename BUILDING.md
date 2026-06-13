@@ -51,14 +51,32 @@ Override the cross prefix for a vendor SDK with
 
 | Path | Contents |
 |---|---|
-| `include/etlx/` | public headers (`core`, `io`, `log`, `conf`) |
+| `include/etlx/` | public headers: `core`, `io`, `log`, `conf`, `storage`, `json`, `crypto`, `net`, `http`, `events`, `sm` |
 | `src/` | platform-independent implementations |
-| `ports/host/` | host backends for the `io`/`log` interfaces |
-| `apps/democli/` | demo OTA-style CLI built on the template |
+| `ports/host/` | host backends: stdout/stderr io+log, file KV store, `/dev/urandom`, POSIX TCP, monotonic clock |
+| `apps/democli/` | demo OTA-style CLI built on the template (install drives the real update FSM) |
 | `examples/` | one runnable `main()` per module |
-| `tests/` | GoogleTest host/qemu unit tests |
+| `tests/` | GoogleTest host/qemu unit tests (73 cases) |
 
-What is implemented today maps to phases 0–1 (plus `log` and `io` from phase 2)
-of the roadmap in `README.md`: the `core` foundation, the declarative CLI
-engine, logging, and the I/O stream model, all with both build options and
-tests green on each.
+## Modules
+
+All modules are heap-free and exception-free, and build under both options:
+
+| Module | What it provides |
+|---|---|
+| `core` | `Error`, `Result`/`Status` (over `etl::expected`), `Optional`, `Span`, time/clock |
+| `io` | `Reader`/`Writer` + `Span`/`Counting`/`Tee` writers and `Copy` |
+| `log` | leveled, compile-time-gated logging with a `Sink` seam |
+| `conf` | declarative CLI model + `CmdlineOptionsIterator` + help rendering |
+| `storage` | `KeyValueStore` (in-memory + host file backend) |
+| `json` | bounded jsmn-style tokenizer + `Json` view accessor |
+| `crypto` | `Hasher`/`Verifier`/`Random` + software SHA-256/HMAC + host RNG |
+| `net` | `Socket` interface + host POSIX TCP port |
+| `http` | request builder + bounded HTTP/1.1 response parser + `Client` |
+| `events` | cooperative `EventLoop` with timers |
+| `sm` | `UpdateFsm` update workflow on `etl::fsm` |
+
+The third-party crypto/TLS and HTTP-parser dependencies named in `README.md`
+(mbedTLS, llhttp) are intentionally replaced here with dependency-free software
+implementations so the cross-aarch64 build needs no extra sysroot libraries;
+the interfaces are swappable, so an mbedTLS / llhttp port can be dropped in.

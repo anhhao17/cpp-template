@@ -64,19 +64,29 @@ Status TlsSocket::Configure(const TlsConfig& cfg) {
     }
 
     // Mutual TLS: present a client certificate + key if configured.
-    if (!cfg.client_cert_pem.empty() && !cfg.client_key_pem.empty()) {
+    // The key is either parsed from PEM (client_key_pem) or an already-set-up
+    // external pk context registered via UseExternalKey() (e.g. SE-backed opaque).
+    const bool have_key = !cfg.client_key_pem.empty() || external_key_ != nullptr;
+    if (!cfg.client_cert_pem.empty() && have_key) {
         if (mbedtls_x509_crt_parse(
                 &own_cert_, reinterpret_cast<const unsigned char*>(cfg.client_cert_pem.data()),
                 cfg.client_cert_pem.size() + 1) != 0) {
             return Fail(Category, TlsError, "parse client cert failed");
         }
-        if (mbedtls_pk_parse_key(
-                &own_key_, reinterpret_cast<const unsigned char*>(cfg.client_key_pem.data()),
-                cfg.client_key_pem.size() + 1, nullptr, 0,
-                mbedtls_ctr_drbg_random, &drbg_) != 0) {
-            return Fail(Category, TlsError, "parse client key failed");
+        mbedtls_pk_context* key_ptr;
+        if (external_key_ != nullptr) {
+            key_ptr = external_key_;
+        } else {
+            if (mbedtls_pk_parse_key(
+                    &own_key_,
+                    reinterpret_cast<const unsigned char*>(cfg.client_key_pem.data()),
+                    cfg.client_key_pem.size() + 1, nullptr, 0,
+                    mbedtls_ctr_drbg_random, &drbg_) != 0) {
+                return Fail(Category, TlsError, "parse client key failed");
+            }
+            key_ptr = &own_key_;
         }
-        if (mbedtls_ssl_conf_own_cert(&conf_, &own_cert_, &own_key_) != 0) {
+        if (mbedtls_ssl_conf_own_cert(&conf_, &own_cert_, key_ptr) != 0) {
             return Fail(Category, TlsError, "set client cert failed");
         }
     }

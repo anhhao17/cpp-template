@@ -52,6 +52,11 @@ public:
     // Connect. Returns TlsError if a PEM blob fails to parse.
     Status Configure(const TlsConfig& config);
 
+    // Use an already-configured pk context (e.g. an SE-backed opaque key) as
+    // the client private key instead of parsing client_key_pem.  Call before
+    // Configure().  The caller owns pk and must ensure it outlives this socket.
+    void UseExternalKey(mbedtls_pk_context& pk) { external_key_ = &pk; }
+
     // Opens the underlying transport, then performs the TLS handshake (sending
     // the client certificate if one was configured).
     Status         Connect(etl::string_view host, uint16_t port) override;
@@ -76,6 +81,8 @@ private:
     mbedtls_x509_crt         ca_;
     mbedtls_x509_crt         own_cert_;
     mbedtls_pk_context       own_key_;
+
+    mbedtls_pk_context* external_key_ = nullptr;
 
     etl::string_view server_name_;
     bool             configured_ = false;

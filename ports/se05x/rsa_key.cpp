@@ -86,7 +86,16 @@ Result<RsaKey> RsaKey::Open(Connection &conn, uint32_t key_id) {
     if (!st)
         return Unexpected<>{st.error()};
 
-    ETLX_LOG_DEBUG("se: opened RSA key id=0x%08x", static_cast<unsigned>(key_id));
+    // Auto-detect modulus size from stored public key (needed for Sign buffer sizing
+    // and for the opaque-pk key_len callback).
+    uint8_t spki_buf[512];
+    size_t spki_len = sizeof(spki_buf);
+    size_t bits = 0;
+    if (sss_key_store_get_key(conn.keystore(), k.obj_.raw(), spki_buf, &spki_len, &bits) ==
+            kStatus_SSS_Success && bits > 0)
+        k.bits_ = bits;
+
+    ETLX_LOG_DEBUG("se: opened RSA-%zu key id=0x%08x", k.bits_, static_cast<unsigned>(key_id));
     return k;
 }
 

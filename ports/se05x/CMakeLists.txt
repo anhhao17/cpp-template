@@ -81,6 +81,7 @@ add_library(etlx_se05x STATIC
   object_store.cpp
   scp03.cpp
   scp03_keyfile.cpp
+  se_pk.cpp
 )
 add_library(etlx::se05x ALIAS etlx_se05x)
 target_include_directories(etlx_se05x PUBLIC ${CMAKE_SOURCE_DIR}/include)

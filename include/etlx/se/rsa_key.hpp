@@ -55,6 +55,9 @@ public:
     // "CN=device-001,O=Acme,C=US".
     Result<CsrPem> MakeCsr(const char *subject_dn);
 
+    // RSA modulus size in bytes (256 for RSA-2048, 512 for RSA-4096).
+    size_t modulus_bytes() const { return bits_ / 8; }
+
     ~RsaKey();
     RsaKey(RsaKey &&) noexcept;
     RsaKey &operator=(RsaKey &&) = delete;

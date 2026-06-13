@@ -32,3 +32,11 @@ if(ETLX_WITH_TLS)
   target_link_libraries(example_mtls_client
     PRIVATE etlx::tls etlx::transport etlx::host etlx_embedded_flags)
 endif()
+
+# SE-backed mTLS: private key operations in the SE05x, TLS handshake via TlsSocket.
+if(ETLX_WITH_SE05X)
+  add_executable(example_se_mtls_client se_mtls_client/main.cpp)
+  target_include_directories(example_se_mtls_client PRIVATE ${CMAKE_SOURCE_DIR})
+  target_link_libraries(example_se_mtls_client
+    PRIVATE etlx::se05x etlx::tls etlx::transport etlx::host etlx_embedded_flags)
+endif()

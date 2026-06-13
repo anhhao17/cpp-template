@@ -39,4 +39,8 @@ etlx_add_test(test_http    http/test_http.cpp)
 etlx_add_test(test_net     net/test_net.cpp LIBS etlx::host)
 etlx_add_test(test_sm      sm/test_sm.cpp)
 etlx_add_test(test_events  events/test_events.cpp)
+
+if(ETLX_WITH_TLS)
+  etlx_add_test(test_tls   net/test_tls.cpp LIBS etlx::tls etlx::host)
+endif()
 etlx_add_test(test_democli democli/test_democli.cpp LIBS democli_lib etlx::host)

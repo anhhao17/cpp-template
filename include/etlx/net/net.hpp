@@ -22,6 +22,7 @@ enum Code : error::Code {
     SendFailed    = 3,
     RecvFailed    = 4,
     Closed        = 5,  // peer closed the connection
+    TlsError      = 6,  // TLS setup or handshake failure
 };
 
 // A bidirectional byte stream to a remote endpoint. Send transmits the whole

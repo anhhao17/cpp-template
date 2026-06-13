@@ -17,3 +17,11 @@ etlx_add_example(sha256_stream)
 etlx_add_example(http_get)
 etlx_add_example(update_fsm)
 etlx_add_example(event_loop)
+
+# The mTLS example needs the TLS library and threads.
+if(ETLX_WITH_TLS)
+  add_executable(example_mtls_client mtls_client/main.cpp)
+  target_include_directories(example_mtls_client PRIVATE ${CMAKE_SOURCE_DIR})
+  target_link_libraries(example_mtls_client
+    PRIVATE etlx::tls etlx::host etlx_embedded_flags)
+endif()

@@ -11,6 +11,7 @@ option(ETLX_BUILD_TESTS    "Build host unit tests (GoogleTest)" ON)
 option(ETLX_BUILD_EXAMPLES "Build per-module example programs"  ON)
 option(ETLX_BUILD_DEMOCLI  "Build the democli example app"      ON)
 option(ETLX_NO_EXCEPTIONS  "Compile library/app code with -fno-exceptions -fno-rtti" ON)
+option(ETLX_WITH_TLS       "Build the TLS/mTLS support (fetches mbedTLS from source)" ON)
 
 # Tests pull in GoogleTest which relies on exceptions/RTTI; when cross-compiling
 # for aarch64 they still run under qemu, so keep them on by default everywhere.

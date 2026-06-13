@@ -2,6 +2,7 @@
 
 #include "apps/democli/actions/actions.hpp"
 #include "etlx/conf/cli.hpp"
+#include "etlx/log/log.hpp"
 #include "host/host_io.hpp"
 
 namespace democli {
@@ -150,12 +151,10 @@ int Main(int argc, const char* const argv[]) {
     auto action = ParseArguments(argc, argv, ctx);
     if (!action) {
         const etlx::error::Error& e = action.error();
-        // Best-effort error line, then top-level help.
-        out.Write(etlx::ConstByteSpan{
-            reinterpret_cast<const uint8_t*>("error: "), 7});
-        out.Write(etlx::ConstByteSpan{
-            reinterpret_cast<const uint8_t*>(e.message.data()), e.message.size()});
-        out.Write(etlx::ConstByteSpan{reinterpret_cast<const uint8_t*>("\n\n"), 2});
+        // Diagnostics go through etlx::log (the sink is wired in main());
+        // command help still goes to stdout for the user.
+        ETLX_LOG_ERROR("%s: %.*s", e.category ? e.category->name : "error",
+                       static_cast<int>(e.message.size()), e.message.data());
         conf::PrintCliHelp(App(), out);
         return ExitError;
     }

@@ -1,6 +1,7 @@
 # Host port: concrete io/log backends for the native host and qemu-aarch64.
 add_library(etlx_host
   host_io.cpp
+  host_kv.cpp
 )
 
 add_library(etlx::host ALIAS etlx_host)

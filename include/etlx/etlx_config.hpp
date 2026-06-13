@@ -38,4 +38,17 @@
 #define ETLX_LOG_LEVEL 4
 #endif
 
+// Key-value store sizing: number of entries, and the per-entry key/value caps.
+#ifndef ETLX_KV_MAX_ENTRIES
+#define ETLX_KV_MAX_ENTRIES 16
+#endif
+
+#ifndef ETLX_KV_KEY_CAPACITY
+#define ETLX_KV_KEY_CAPACITY 32
+#endif
+
+#ifndef ETLX_KV_VALUE_CAPACITY
+#define ETLX_KV_VALUE_CAPACITY 128
+#endif
+
 #endif // ETLX_CONFIG_HPP

@@ -65,4 +65,30 @@
 #define ETLX_EVENTS_MAX_TIMERS 8
 #endif
 
+// SE05x port sizing. These bound the on-stack ASN.1 scratch buffers and the
+// fixed-size etl containers used in the public SE API surface.
+#ifndef ETLX_SE_SPKI_CAPACITY
+#define ETLX_SE_SPKI_CAPACITY 512    // DER SPKI for RSA-2048 ≈ 294 bytes
+#endif
+
+#ifndef ETLX_SE_SIG_CAPACITY
+#define ETLX_SE_SIG_CAPACITY 512     // RSA-2048 sig = 256 bytes; covers up to 4096
+#endif
+
+#ifndef ETLX_SE_CSR_PEM_CAPACITY
+#define ETLX_SE_CSR_PEM_CAPACITY 2048 // PEM CSR for RSA-2048 ≈ 1.7 kB
+#endif
+
+#ifndef ETLX_SE_CERT_CAPACITY
+#define ETLX_SE_CERT_CAPACITY 2048   // DER cert for RSA-2048 identity
+#endif
+
+#ifndef ETLX_SE_BLOB_CAPACITY
+#define ETLX_SE_BLOB_CAPACITY 512    // binary objects (device-info, SCP03 keys)
+#endif
+
+#ifndef ETLX_SE_UID_LEN
+#define ETLX_SE_UID_LEN 18           // SE05x chip UID is always 18 bytes
+#endif
+
 #endif // ETLX_CONFIG_HPP

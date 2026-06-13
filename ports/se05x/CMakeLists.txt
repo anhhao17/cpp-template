@@ -71,10 +71,13 @@ target_compile_options(etlx_simw PRIVATE -w)
 # etlx_se05x: the C++ façade over the NXP middleware.
 # Phase 0: se05x_probe.cpp (build-spike TU, verifies SSS headers link)
 # Phase 1: se_connection.cpp (Connection RAII), se_random.cpp (SeRandom)
+# Phase 2: rsa_key.cpp (RSA generate/open/sign/CSR), object_store.cpp (cert/blob)
 add_library(etlx_se05x STATIC
   se05x_probe.cpp
   se_connection.cpp
   se_random.cpp
+  rsa_key.cpp
+  object_store.cpp
 )
 add_library(etlx::se05x ALIAS etlx_se05x)
 target_include_directories(etlx_se05x PUBLIC ${CMAKE_SOURCE_DIR}/include)

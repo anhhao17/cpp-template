@@ -99,6 +99,7 @@ Result<RsaKey> RsaKey::Open(Connection &conn, uint32_t key_id) {
 }
 
 Result<RsaKey::SigBytes> RsaKey::Sign(const uint8_t *digest, size_t digest_len) {
+    ETLX_LOG_DEBUG("se: sign RSA-%zu digest_len=%zu", bits_, digest_len);
     sss_asymmetric_t ctx{};
     sss_status_t st = sss_asymmetric_context_init(&ctx, obj_.conn().session(), obj_.raw(),
                                                   kAlgorithm_SSS_RSASSA_PKCS1_V1_5_SHA256,
@@ -120,22 +121,26 @@ Result<RsaKey::SigBytes> RsaKey::Sign(const uint8_t *digest, size_t digest_len) 
     return sig;
 }
 
-bool RsaKey::Verify(const uint8_t *digest, size_t digest_len,
-                    const uint8_t *sig, size_t sig_len) {
+Result<bool> RsaKey::Verify(const uint8_t *digest, size_t digest_len,
+                            const uint8_t *sig, size_t sig_len) {
+    ETLX_LOG_DEBUG("se: verify RSA-%zu sig_len=%zu", bits_, sig_len);
     sss_asymmetric_t ctx{};
     if (sss_asymmetric_context_init(&ctx, obj_.conn().session(), obj_.raw(),
                                     kAlgorithm_SSS_RSASSA_PKCS1_V1_5_SHA256,
                                     kMode_SSS_Verify) != kStatus_SSS_Success)
-        return false;
+        return SeFail(kSignFailed, "asymmetric_context_init(verify) failed");
 
     sss_status_t st = sss_asymmetric_verify_digest(
         &ctx, const_cast<uint8_t *>(digest), digest_len,
         const_cast<uint8_t *>(sig), sig_len);
     sss_asymmetric_context_free(&ctx);
-    return st == kStatus_SSS_Success;
+    bool ok = (st == kStatus_SSS_Success);
+    ETLX_LOG_DEBUG("se: verify result=%s", ok ? "OK" : "FAIL");
+    return ok;
 }
 
 Result<RsaKey::SpkiDer> RsaKey::PublicKeyDer() {
+    ETLX_LOG_DEBUG("se: publicKeyDer RSA-%zu", bits_);
     SpkiDer buf;
     buf.resize(ETLX_SE_SPKI_CAPACITY);
     size_t len = buf.size();

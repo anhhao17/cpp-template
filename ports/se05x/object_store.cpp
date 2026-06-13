@@ -10,6 +10,7 @@ extern "C" {
 namespace etlx::se {
 
 Result<ObjectStore::Uid> ObjectStore::GetUid() {
+    ETLX_LOG_DEBUG("se: getUid");
     Uid uid{};
     size_t uid_len = uid.size();
     sss_status_t st =
@@ -19,21 +20,27 @@ Result<ObjectStore::Uid> ObjectStore::GetUid() {
                        static_cast<unsigned>(st));
         return SeFail(kReadFailed, "sss_session_prop_get_au8(UID) failed");
     }
+    ETLX_LOG_DEBUG("se: getUid OK (%zu bytes)", uid_len);
     return uid;
 }
 
 bool ObjectStore::Exists(uint32_t id) {
     KeyObject obj(conn_);
-    return obj.Bind(id);
+    bool found = obj.Open(id).has_value();
+    ETLX_LOG_DEBUG("se: exists id=0x%08x -> %s", static_cast<unsigned>(id),
+                   found ? "yes" : "no");
+    return found;
 }
 
 Status ObjectStore::Erase(uint32_t id) {
+    ETLX_LOG_DEBUG("se: erase id=0x%08x", static_cast<unsigned>(id));
     KeyObject obj(conn_);
     auto st = obj.Open(id);
     if (!st)
         return st;
     if (sss_key_store_erase_key(conn_.keystore(), obj.raw()) != kStatus_SSS_Success)
         return SeFail(kWriteFailed, "sss_key_store_erase_key failed");
+    ETLX_LOG_DEBUG("se: erase id=0x%08x OK", static_cast<unsigned>(id));
     return Ok();
 }
 
@@ -85,7 +92,7 @@ Result<bool> ObjectStore::WriteBinary(uint32_t id, const uint8_t *data, size_t d
 Result<ObjectStore::BlobData> ObjectStore::ReadBinary(uint32_t id) {
     ETLX_LOG_DEBUG("se: readBinary id=0x%08x", static_cast<unsigned>(id));
     KeyObject obj(conn_);
-    if (!obj.Bind(id))
+    if (auto st = obj.Open(id); !st)
         return SeFail(kReadFailed, "readBinary: object not found");
 
     BlobData buf;

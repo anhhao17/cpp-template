@@ -29,11 +29,6 @@ public:
     KeyObject(const KeyObject &) = delete;
     KeyObject &operator=(const KeyObject &) = delete;
 
-    // Bind to an existing persisted object.  Returns false if not found.
-    bool Bind(uint32_t id) {
-        return sss_key_object_get_handle(&obj_, id) == kStatus_SSS_Success;
-    }
-
     // Bind to an existing persisted object; returns error if absent.
     Status Open(uint32_t id) {
         if (sss_key_object_get_handle(&obj_, id) != kStatus_SSS_Success)

@@ -26,29 +26,26 @@ jobs:
       - name: Test
         run: ctest --preset ${{ matrix.preset }} --output-on-failure
 
-  # ── SE05x port: build-only (no hardware in CI) ────────────────────────────
+  # ── SE05x port: build + test (hardware tests skip; compile verified) ─────
   se05x-build:
-    name: SE05x build
+    name: SE05x build + tests (socket preset, no hardware)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install tools
         run: sudo apt-get install -y cmake ninja-build
-      - name: Configure (SE05x + examples, tests off)
-        run: |
-          cmake -S . -B build/se05x -G Ninja \
-            -DETLX_WITH_SE05X=ON \
-            -DETLX_BUILD_TESTS=OFF \
-            -DETLX_BUILD_EXAMPLES=ON \
-            -DETLX_BUILD_DEMOCLI=OFF
+      - name: Configure (socket transport, tests ON)
+        run: cmake --preset se05x-socket
       - name: Build
-        run: cmake --build build/se05x
+        run: cmake --build build/se05x-socket
+      - name: Test (SE tests skip; non-SE tests run)
+        # EX_SSS_BOOT_SSS_PORT unset → all SE tests report SKIPPED, not FAILED.
+        run: ctest --preset se05x-socket --output-on-failure
       - name: Smoke-test se_mtls_client (software fallback, no SE hardware)
         run: |
           # EX_SSS_BOOT_SSS_PORT not set → software key fallback, should exit 0
-          ./build/se05x/examples/example_se_mtls_client
+          ./build/se05x-socket/examples/example_se_mtls_client
 
-  # ── Boost.Asio transport ─────────────────────────────────────────────────
   asio:
     name: Asio transport
     runs-on: ubuntu-latest
@@ -67,7 +64,6 @@ jobs:
       - name: Test
         run: ctest --test-dir build/asio --output-on-failure
 
-  # ── aarch64 cross-compile + qemu ─────────────────────────────────────────
   aarch64:
     name: aarch64 cross + qemu
     runs-on: ubuntu-latest

@@ -58,3 +58,19 @@ if(ETLX_WITH_TLS)
   etlx_add_test(test_tls   net/test_tls.cpp LIBS etlx::tls etlx::transport)
 endif()
 etlx_add_test(test_democli democli/test_democli.cpp LIBS democli_lib etlx::host)
+
+# SE05x hardware/simulator integration tests.
+# Tests skip automatically when EX_SSS_BOOT_SSS_PORT is not set, so they are
+# safe to include in the normal ctest run.  Set the env var to run against
+# the simulator (socket transport) or real I2C hardware.
+if(ETLX_WITH_SE05X)
+  etlx_add_test(test_se_connection
+    se/test_se_connection.cpp
+    LIBS etlx::se05x)
+  etlx_add_test(test_se_rsa_key
+    se/test_se_rsa_key.cpp
+    LIBS etlx::se05x)
+  etlx_add_test(test_se_object_store
+    se/test_se_object_store.cpp
+    LIBS etlx::se05x)
+endif()

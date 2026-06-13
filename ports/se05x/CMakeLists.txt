@@ -11,6 +11,17 @@
 
 set(SIMW_LIB_DIR ${plugandtrust_SOURCE_DIR})
 
+# Transport selection.
+# i2c    (default): T1oI2C — direct Linux I2C bus (/dev/i2c-*), real hardware.
+# socket: JRCP V1 over TCP — NXP's GenericJRCPServer simulator or VCOM bridge.
+#         Set EX_SSS_BOOT_SSS_PORT=127.0.0.1:8050 (or your bridge address).
+set(ETLX_SE05X_TRANSPORT "i2c" CACHE STRING "SE05x transport: i2c or socket")
+set_property(CACHE ETLX_SE05X_TRANSPORT PROPERTY STRINGS i2c socket)
+if(NOT ETLX_SE05X_TRANSPORT MATCHES "^(i2c|socket)$")
+  message(FATAL_ERROR "ETLX_SE05X_TRANSPORT must be 'i2c' or 'socket'")
+endif()
+message(STATUS "etlx: SE05x transport = ${ETLX_SE05X_TRANSPORT}")
+
 # Match the hardware/middleware (see CLAUDE.md in the SE051 project).
 set(PTMW_Applet     SE05X_C   CACHE STRING "" FORCE)
 set(PTMW_SE05X_Ver  07_02     CACHE STRING "" FORCE)  # 07_xx = SE051/SE052
@@ -44,6 +55,23 @@ list(REMOVE_ITEM SIMW_SE_SOURCES
   ${SIMW_LIB_DIR}/sss/src/keystore/keystore_openssl.c)
 list(APPEND SIMW_SE_SOURCES
   ${SIMW_LIB_DIR}/sss/src/mbedtls/fsl_sss_mbedtls_apis.c)
+
+# Transport swap: socket replaces T1oI2C sources with our JRCP V1 socket client.
+if(ETLX_SE05X_TRANSPORT STREQUAL "socket")
+  list(REMOVE_ITEM SIMW_SE_SOURCES
+    ${SIMW_LIB_DIR}/hostlib/hostLib/libCommon/smCom/smComT1oI2C.c)
+  # Remove T1oI2C glob and hardware-reset driver (calls smComT1oI2C_ComReset).
+  list(FILTER SIMW_SE_SOURCES EXCLUDE REGEX ".*/T1oI2C/.*")
+  list(FILTER SIMW_SE_SOURCES EXCLUDE REGEX ".*/platform/rsp/se05x_reset\\.c$")
+  list(APPEND SIMW_SE_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/smComSocket_fd.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/smComSocket.c)
+  # Override the compile-time transport flags set by simw_lib.cmake.
+  remove_definitions(-DSMCOM_T1oI2C -DT1oI2C -DT1oI2C_UM11225)
+  add_definitions(-DSMCOM_JRCP_V1=1)
+  # smComSocket.h lives in ports/se05x — add to include path.
+  set(SIMW_INC_DIR "${SIMW_INC_DIR};${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
 
 add_library(etlx_simw STATIC ${SIMW_SE_SOURCES} ${SIMW_SE_AUTH_SOURCES})
 

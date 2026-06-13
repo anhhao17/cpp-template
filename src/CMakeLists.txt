@@ -5,6 +5,7 @@ add_library(etlx
   log/log.cpp
   conf/cli.cpp
   storage/kv.cpp
+  json/json.cpp
 )
 
 add_library(etlx::etlx ALIAS etlx)

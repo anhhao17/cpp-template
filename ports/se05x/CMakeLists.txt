@@ -1,4 +1,4 @@
-# SE05x host port (Phase 0: build spike).
+# SE05x host port (Phases 0-1: build spike + session/RNG).
 #
 # Builds a curated static library from NXP's Plug & Trust SSS sources, compiled
 # against etlx's fetched mbedTLS 3.6.6 (the 3.x API surface, SSS_HAVE_MBEDTLS_2_X
@@ -68,9 +68,14 @@ target_compile_definitions(etlx_simw PRIVATE MBEDTLS_ALLOW_PRIVATE_ACCESS)
 # don't impose our strict flags on third-party code.
 target_compile_options(etlx_simw PRIVATE -w)
 
-# Phase 0 probe: a TU that includes the SSS headers and links, proving the
-# toolchain + mbedTLS-3.x wiring compiles for native and aarch64.
-add_library(etlx_se05x STATIC se05x_probe.cpp)
+# etlx_se05x: the C++ façade over the NXP middleware.
+# Phase 0: se05x_probe.cpp (build-spike TU, verifies SSS headers link)
+# Phase 1: se_connection.cpp (Connection RAII), se_random.cpp (SeRandom)
+add_library(etlx_se05x STATIC
+  se05x_probe.cpp
+  se_connection.cpp
+  se_random.cpp
+)
 add_library(etlx::se05x ALIAS etlx_se05x)
 target_include_directories(etlx_se05x PUBLIC ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(etlx_se05x PUBLIC etlx::etlx etlx_simw)
+target_link_libraries(etlx_se05x PUBLIC etlx::etlx etlx::host etlx_simw)

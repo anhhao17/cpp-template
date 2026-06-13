@@ -1,17 +1,9 @@
 // se_factory: factory provisioning CLI for the NXP SE05x secure element.
 //
-// Commands:
-//   provision    Generate RSA key, create CSR, print CSR PEM
-//   write-cert   Write a DER certificate file to the SE cert object
-//   write-info   Write an arbitrary binary blob to the SE device-info object
-//   read-info    Read and hex-dump the device-info object
-//   rotate-scp03 Rotate Platform SCP03 keys (GP PUT KEY)
-//   uid          Print the 18-byte chip UID
-//   verify       Verify the binding between the SE key and a DER certificate
-//
-// All commands require EX_SSS_BOOT_SCP03_PATH to be set (Platform SCP03).
-// The --port flag overrides the connection string (default: env / middleware).
+// SCP03 keys are hardcoded in se_connection.cpp (kDefaultKeys).
+// Use --port to override the connection string (default: EX_SSS_BOOT_SSS_PORT).
 
+#include <etlx/conf/cli.hpp>
 #include <etlx/se/connection.hpp>
 #include <etlx/se/object_store.hpp>
 #include <etlx/se/rsa_key.hpp>
@@ -24,66 +16,108 @@
 
 using namespace etlx;
 using namespace etlx::se;
+namespace conf = etlx::conf;
 
-static void Usage(const char *prog) {
-    std::fprintf(stderr,
-                 "Usage: %s [--port <p>] <command> [args]\n"
-                 "Commands:\n"
-                 "  provision [--bits 2048|4096] [--policy full|sign-only|sign-decrypt]\n"
-                 "            [--subject <dn>]   Generate key + print CSR PEM\n"
-                 "  write-cert <cert.der>         Write DER cert to SE (id=0x%08x)\n"
-                 "  write-info <blob.bin>         Write binary blob (id=0x%08x)\n"
-                 "  read-info                     Hex-dump device-info blob\n"
-                 "  rotate-scp03 <newkeys.txt>   Rotate SCP03 keys from file\n"
-                 "                [--dry-run]     Build APDU but do not send\n"
-                 "  uid                           Print the 18-byte chip UID\n"
-                 "  verify <cert.der>             Verify SE key matches cert\n",
-                 prog,
-                 static_cast<unsigned>(kRsaCertId),
-                 static_cast<unsigned>(kDeviceInfoId));
+static const conf::CliApp& App() {
+    static const conf::CliApp app = [] {
+        conf::CliApp a;
+        a.name              = "se_factory";
+        a.short_description = "Factory provisioning CLI for the NXP SE05x";
+        a.long_description  = "Global: --port <addr>  (default: EX_SSS_BOOT_SSS_PORT)";
+
+        {
+            conf::CliCommand cmd;
+            cmd.name        = "provision";
+            cmd.description = "Generate RSA key + print CSR PEM";
+            cmd.options.push_back({"--bits",    "Key size: 2048 (default) or 4096", "BITS"});
+            cmd.options.push_back({"--policy",  "full | sign-only | sign-decrypt",  "POLICY"});
+            cmd.options.push_back({"--subject", "Subject DN for the CSR",           "DN"});
+            a.commands.push_back(cmd);
+        }
+        {
+            conf::CliCommand cmd;
+            cmd.name        = "write-cert";
+            cmd.description = "Write DER cert to SE cert object";
+            cmd.argument    = conf::CliArgument{"cert.der", true};
+            a.commands.push_back(cmd);
+        }
+        {
+            conf::CliCommand cmd;
+            cmd.name        = "write-info";
+            cmd.description = "Write binary blob to SE device-info object";
+            cmd.argument    = conf::CliArgument{"blob.bin", true};
+            a.commands.push_back(cmd);
+        }
+        {
+            conf::CliCommand cmd;
+            cmd.name        = "read-info";
+            cmd.description = "Hex-dump the device-info object";
+            a.commands.push_back(cmd);
+        }
+        {
+            conf::CliCommand cmd;
+            cmd.name        = "rotate-scp03";
+            cmd.description = "Rotate SCP03 keys via GP PUT KEY";
+            cmd.argument    = conf::CliArgument{"newkeys.txt", true};
+            cmd.options.push_back({"--dry-run", "Build APDU but do not send", ""});
+            a.commands.push_back(cmd);
+        }
+        {
+            conf::CliCommand cmd;
+            cmd.name        = "uid";
+            cmd.description = "Print the 18-byte chip UID";
+            a.commands.push_back(cmd);
+        }
+        {
+            conf::CliCommand cmd;
+            cmd.name        = "verify";
+            cmd.description = "Verify SE key matches a DER certificate";
+            cmd.argument    = conf::CliArgument{"cert.der", true};
+            a.commands.push_back(cmd);
+        }
+
+        return a;
+    }();
+    return app;
 }
 
-// Read a binary file into a fixed-size buffer; returns bytes read or 0 on error.
 static size_t ReadFile(const char *path, uint8_t *buf, size_t capacity) {
     FILE *fp = std::fopen(path, "rb");
-    if (!fp) {
-        ETLX_LOG_ERROR("se_factory: cannot open '%s'", path);
-        return 0;
-    }
+    if (!fp) { ETLX_LOG_ERROR("se_factory: cannot open '%s'", path); return 0; }
     size_t n = std::fread(buf, 1, capacity, fp);
     std::fclose(fp);
     return n;
 }
 
-static int CmdProvision(Connection &conn, int argc, char **argv) {
+static int CmdProvision(Connection &conn, const conf::CliCommand &cmd,
+                        int argc, char **argv) {
     RsaBits bits = RsaBits::k2048;
     KeyPolicy policy = KeyPolicy::SignOnly;
     const char *subject_dn = "CN=SE05x-Device";
 
-    for (int i = 0; i < argc; ++i) {
-        if (std::strcmp(argv[i], "--bits") == 0 && i + 1 < argc) {
-            ++i;
-            if (std::strcmp(argv[i], "4096") == 0)
-                bits = RsaBits::k4096;
-        } else if (std::strcmp(argv[i], "--policy") == 0 && i + 1 < argc) {
-            ++i;
-            if (std::strcmp(argv[i], "full") == 0) policy = KeyPolicy::Full;
-            else if (std::strcmp(argv[i], "sign-decrypt") == 0) policy = KeyPolicy::SignDecrypt;
-        } else if (std::strcmp(argv[i], "--subject") == 0 && i + 1 < argc) {
-            subject_dn = argv[++i];
+    conf::CmdlineOptionsIterator it(argc, argv, cmd);
+    for (;;) {
+        auto next = it.Next();
+        if (!next) {
+            ETLX_LOG_ERROR("provision: %s", next.error().message.c_str());
+            return 1;
+        }
+        if (!next.value()) break;
+        const auto &ov = next.value().value();
+        if (ov.option == "--bits") {
+            if (ov.value == "4096") bits = RsaBits::k4096;
+        } else if (ov.option == "--policy") {
+            if      (ov.value == "full")         policy = KeyPolicy::Full;
+            else if (ov.value == "sign-decrypt") policy = KeyPolicy::SignDecrypt;
+        } else if (ov.option == "--subject") {
+            subject_dn = ov.value.data(); // argv-backed, null-terminated
         }
     }
 
     auto key_res = RsaKey::Generate(conn, kRsaKeyId, bits, policy);
-    if (!key_res) {
-        ETLX_LOG_ERROR("provision: %s", key_res.error().message.c_str());
-        return 1;
-    }
+    if (!key_res) { ETLX_LOG_ERROR("provision: %s", key_res.error().message.c_str()); return 1; }
     auto csr_res = key_res.value().MakeCsr(subject_dn);
-    if (!csr_res) {
-        ETLX_LOG_ERROR("provision: CSR: %s", csr_res.error().message.c_str());
-        return 1;
-    }
+    if (!csr_res) { ETLX_LOG_ERROR("provision: CSR: %s", csr_res.error().message.c_str()); return 1; }
     std::fputs(csr_res.value().c_str(), stdout);
     return 0;
 }
@@ -123,19 +157,40 @@ static int CmdReadInfo(Connection &conn) {
     return 0;
 }
 
-static int CmdRotateScp03(const char *port, const char *newkeys_path, bool dry_run) {
+static int CmdRotateScp03(const char *port, const conf::CliCommand &cmd,
+                          int argc, char **argv) {
+    const char *keyfile = nullptr;
+    bool dry_run = false;
+
+    conf::CmdlineOptionsIterator it(argc, argv, cmd);
+    for (;;) {
+        auto next = it.Next();
+        if (!next) {
+            ETLX_LOG_ERROR("rotate-scp03: %s", next.error().message.c_str());
+            return 1;
+        }
+        if (!next.value()) break;
+        const auto &ov = next.value().value();
+        if (ov.is_argument)         keyfile  = ov.value.data();
+        else if (ov.option == "--dry-run") dry_run = true;
+    }
+    if (!keyfile) {
+        ETLX_LOG_ERROR("rotate-scp03: missing <newkeys.txt> argument");
+        return 1;
+    }
+
     auto conn_res = Connection::Open(port, /*select_applet=*/false);
     if (!conn_res) {
         ETLX_LOG_ERROR("rotate-scp03: open: %s", conn_res.error().message.c_str());
         return 1;
     }
     Scp03Admin admin(std::move(conn_res.value()));
-    auto new_keys_res = scp03_keyfile::Read(newkeys_path);
+    auto new_keys_res = scp03_keyfile::Read(keyfile);
     if (!new_keys_res) {
         ETLX_LOG_ERROR("rotate-scp03: %s", new_keys_res.error().message.c_str());
         return 1;
     }
-    auto st = admin.Rotate(new_keys_res.value(), dry_run, dry_run ? nullptr : newkeys_path);
+    auto st = admin.Rotate(new_keys_res.value(), dry_run, dry_run ? nullptr : keyfile);
     if (!st) { ETLX_LOG_ERROR("rotate-scp03: %s", st.error().message.c_str()); return 1; }
     return 0;
 }
@@ -166,25 +221,35 @@ int main(int argc, char **argv) {
     log::SetSink(&log_sink);
     log::SetLevel(log::Level::Info);
 
+    ports::host::FileWriter out; // stdout
+
+    // Consume global --port flag before the command name.
     const char *port = nullptr;
     int argi = 1;
-
     while (argi < argc && std::strncmp(argv[argi], "--", 2) == 0) {
         if (std::strcmp(argv[argi], "--port") == 0 && argi + 1 < argc)
             port = argv[++argi];
         ++argi;
     }
 
-    if (argi >= argc) { Usage(argv[0]); return 1; }
-    const char *cmd = argv[argi++];
-
-    // rotate-scp03 needs its own ISD session (skip_select_applet).
-    if (std::strcmp(cmd, "rotate-scp03") == 0) {
-        if (argi >= argc) { Usage(argv[0]); return 1; }
-        const char *keyfile = argv[argi++];
-        bool dry = (argi < argc && std::strcmp(argv[argi], "--dry-run") == 0);
-        return CmdRotateScp03(port, keyfile, dry);
+    if (argi >= argc || etl::string_view{argv[argi]} == "--help" ||
+        etl::string_view{argv[argi]} == "-h" || etl::string_view{argv[argi]} == "help") {
+        conf::PrintCliHelp(App(), out);
+        return 0;
     }
+
+    const etl::string_view cmd_name{argv[argi++]};
+    const conf::CliCommand *cmd = conf::FindCommand(App(), cmd_name);
+    if (!cmd) {
+        ETLX_LOG_ERROR("se_factory: unknown command '%.*s'",
+                       static_cast<int>(cmd_name.size()), cmd_name.data());
+        conf::PrintCliHelp(App(), out);
+        return 1;
+    }
+
+    // rotate-scp03 opens its own ISD session (select_applet=false).
+    if (cmd_name == "rotate-scp03")
+        return CmdRotateScp03(port, *cmd, argc - argi, argv + argi);
 
     // All other commands share one normal (applet-selected) session.
     auto conn_res = Connection::Open(port);
@@ -194,24 +259,28 @@ int main(int argc, char **argv) {
     }
     Connection &conn = conn_res.value();
 
-    if (std::strcmp(cmd, "provision") == 0)
-        return CmdProvision(conn, argc - argi, argv + argi);
-    if (std::strcmp(cmd, "write-cert") == 0) {
-        if (argi >= argc) { Usage(argv[0]); return 1; }
-        return CmdWriteCert(conn, argv[argi]);
-    }
-    if (std::strcmp(cmd, "write-info") == 0) {
-        if (argi >= argc) { Usage(argv[0]); return 1; }
-        return CmdWriteInfo(conn, argv[argi]);
-    }
-    if (std::strcmp(cmd, "read-info") == 0) return CmdReadInfo(conn);
-    if (std::strcmp(cmd, "uid") == 0) return CmdUid(conn);
-    if (std::strcmp(cmd, "verify") == 0) {
-        if (argi >= argc) { Usage(argv[0]); return 1; }
-        return CmdVerify(conn, argv[argi]);
+    if (cmd_name == "provision")
+        return CmdProvision(conn, *cmd, argc - argi, argv + argi);
+
+    // Commands with a single mandatory positional argument.
+    const char *path = nullptr;
+    if (cmd->argument) {
+        if (argi > argc - 1) {
+            ETLX_LOG_ERROR("se_factory: %.*s: missing <%.*s> argument",
+                           static_cast<int>(cmd_name.size()), cmd_name.data(),
+                           static_cast<int>(cmd->argument.value().name.size()),
+                           cmd->argument.value().name.data());
+            conf::PrintCliCommandHelp(App(), cmd_name, out);
+            return 1;
+        }
+        path = argv[argi];
     }
 
-    std::fprintf(stderr, "Unknown command: %s\n", cmd);
-    Usage(argv[0]);
-    return 1;
+    if (cmd_name == "write-cert") return CmdWriteCert(conn, path);
+    if (cmd_name == "write-info") return CmdWriteInfo(conn, path);
+    if (cmd_name == "read-info")  return CmdReadInfo(conn);
+    if (cmd_name == "uid")        return CmdUid(conn);
+    if (cmd_name == "verify")     return CmdVerify(conn, path);
+
+    return 1; // unreachable
 }

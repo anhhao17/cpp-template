@@ -1,10 +1,11 @@
-// Example: drive the etlx http::Client over a Boost.Asio transport. A tiny
+// Example: drive the etlx http::Client over the selected TCP transport. A tiny
 // loopback HTTP server returns a canned response; the client connects with an
-// AsioTcpSocket, issues a GET, and the response is parsed by the same bounded
-// http parser used everywhere else. Demonstrates that swapping the transport
-// (POSIX -> Asio) needs no change to http. Build target: example_asio_http_get.
-#include "asio/asio_tcp.hpp"
+// etlx::net::TcpSocket -- which is the POSIX socket or the Boost.Asio socket
+// depending on the build-time ETLX_TRANSPORT setting -- issues a GET, and the
+// response is parsed by the same bounded http parser. Swapping the transport
+// needs no source change. Build target: example_tcp_http_get.
 #include "etlx/http/http.hpp"
+#include "etlx/net/tcp_socket.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -47,8 +48,8 @@ int main() {
     const uint16_t port = ntohs(addr.sin_port);
     std::thread server(RunHttpServer, listen_fd);
 
-    // Boost.Asio transport + the etlx HTTP client.
-    etlx::ports::asio::AsioTcpSocket sock;
+    // The selected transport (POSIX or Asio) feeding the etlx HTTP client.
+    etlx::net::TcpSocket sock;
     int rc = 1;
     if (auto c = sock.Connect("127.0.0.1", port); !c) {
         std::printf("connect failed: %s\n", c.error().message.c_str());

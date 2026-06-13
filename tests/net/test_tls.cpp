@@ -1,5 +1,5 @@
+#include "etlx/net/tcp_socket.hpp"
 #include "etlx/net/tls.hpp"
-#include "host/host_tcp.hpp"
 #include "tests/net/test_certs.hpp"
 #include "tests/support/tls_echo_server.hpp"
 
@@ -19,7 +19,7 @@ TEST(TlsMutualAuth, ClientCertAcceptedAndEcho) {
     TlsEchoServer server(/*require_client_cert=*/true);
     const uint16_t port = server.Start();
 
-    etlx::ports::host::PosixTcpSocket tcp;
+    etlx::net::TcpSocket tcp;
     etlx::net::TlsSocket             tls(tcp);
 
     etlx::net::TlsConfig cfg;
@@ -55,7 +55,7 @@ TEST(TlsMutualAuth, MissingClientCertRejected) {
     TlsEchoServer server(/*require_client_cert=*/true);
     const uint16_t port = server.Start();
 
-    etlx::ports::host::PosixTcpSocket tcp;
+    etlx::net::TcpSocket tcp;
     etlx::net::TlsSocket             tls(tcp);
 
     etlx::net::TlsConfig cfg;
@@ -84,7 +84,7 @@ TEST(TlsMutualAuth, ServerOnlyTlsSucceeds) {
     TlsEchoServer server(/*require_client_cert=*/false);
     const uint16_t port = server.Start();
 
-    etlx::ports::host::PosixTcpSocket tcp;
+    etlx::net::TcpSocket tcp;
     etlx::net::TlsSocket             tls(tcp);
 
     etlx::net::TlsConfig cfg;
@@ -102,7 +102,7 @@ TEST(TlsServerVerify, UntrustedServerRejected) {
     TlsEchoServer server(/*require_client_cert=*/false);
     const uint16_t port = server.Start();
 
-    etlx::ports::host::PosixTcpSocket tcp;
+    etlx::net::TcpSocket tcp;
     etlx::net::TlsSocket             tls(tcp);
 
     etlx::net::TlsConfig cfg;

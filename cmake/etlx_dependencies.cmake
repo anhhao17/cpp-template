@@ -32,7 +32,7 @@ endif()
 # points at a non-existent directory so FetchContent only downloads/extracts and
 # never add_subdirectory()s Boost's own build. An INTERFACE target exposes the
 # include path. This cross-compiles to aarch64 with no Boost build step.
-if(ETLX_WITH_ASIO)
+if(ETLX_TRANSPORT STREQUAL "asio")
   FetchContent_Declare(
     boost
     URL      https://archives.boost.io/release/1.91.0/source/boost_1_91_0.tar.bz2

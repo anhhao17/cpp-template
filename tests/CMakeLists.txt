@@ -36,22 +36,25 @@ etlx_add_test(test_kv      storage/test_kv.cpp LIBS etlx::host)
 etlx_add_test(test_json    json/test_json.cpp)
 etlx_add_test(test_crypto  crypto/test_crypto.cpp LIBS etlx::host)
 etlx_add_test(test_http    http/test_http.cpp)
-etlx_add_test(test_net     net/test_net.cpp LIBS etlx::host)
 etlx_add_test(test_sm      sm/test_sm.cpp)
 etlx_add_test(test_events  events/test_events.cpp)
 
-if(ETLX_WITH_TLS)
-  etlx_add_test(test_tls   net/test_tls.cpp LIBS etlx::tls etlx::host)
-endif()
-
-if(ETLX_WITH_ASIO)
+# Transport-specific tests build only for the selected backend.
+if(ETLX_TRANSPORT STREQUAL "posix")
+  etlx_add_test(test_net   net/test_net.cpp LIBS etlx::transport)
+elseif(ETLX_TRANSPORT STREQUAL "asio")
   if(ETLX_WITH_TLS)
     # Also exercise mutual TLS layered over the Asio transport.
-    etlx_add_test(test_asio asio/test_asio.cpp LIBS etlx::asio etlx::tls etlx::host)
+    etlx_add_test(test_asio asio/test_asio.cpp LIBS etlx::transport etlx::tls)
     target_compile_definitions(test_asio PRIVATE ETLX_TEST_WITH_TLS=1)
   else()
-    etlx_add_test(test_asio asio/test_asio.cpp LIBS etlx::asio)
+    etlx_add_test(test_asio asio/test_asio.cpp LIBS etlx::transport)
     target_compile_definitions(test_asio PRIVATE ETLX_TEST_WITH_TLS=0)
   endif()
+endif()
+
+# TLS test runs over whichever transport is selected.
+if(ETLX_WITH_TLS)
+  etlx_add_test(test_tls   net/test_tls.cpp LIBS etlx::tls etlx::transport)
 endif()
 etlx_add_test(test_democli democli/test_democli.cpp LIBS democli_lib etlx::host)

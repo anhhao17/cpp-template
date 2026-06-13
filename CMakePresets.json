@@ -33,12 +33,26 @@
       "inherits": "base",
       "toolchainFile": "${sourceDir}/cmake/toolchains/aarch64-linux-gnu.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "native-asio",
+      "displayName": "Native build, Boost.Asio transport",
+      "inherits": "native",
+      "cacheVariables": { "ETLX_TRANSPORT": "asio" }
+    },
+    {
+      "name": "aarch64-asio",
+      "displayName": "Cross aarch64 build, Boost.Asio transport",
+      "inherits": "aarch64",
+      "cacheVariables": { "ETLX_TRANSPORT": "asio" }
     }
   ],
   "buildPresets": [
-    { "name": "native",      "configurePreset": "native" },
-    { "name": "native-asan", "configurePreset": "native-asan" },
-    { "name": "aarch64",     "configurePreset": "aarch64" }
+    { "name": "native",       "configurePreset": "native" },
+    { "name": "native-asan",  "configurePreset": "native-asan" },
+    { "name": "native-asio",  "configurePreset": "native-asio" },
+    { "name": "aarch64",      "configurePreset": "aarch64" },
+    { "name": "aarch64-asio", "configurePreset": "aarch64-asio" }
   ],
   "testPresets": [
     {
@@ -47,8 +61,18 @@
       "output": { "outputOnFailure": true }
     },
     {
+      "name": "native-asio",
+      "configurePreset": "native-asio",
+      "output": { "outputOnFailure": true }
+    },
+    {
       "name": "aarch64",
       "configurePreset": "aarch64",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "aarch64-asio",
+      "configurePreset": "aarch64-asio",
       "output": { "outputOnFailure": true }
     }
   ]

@@ -7,8 +7,8 @@
 // To talk to a real endpoint instead, drop the server and call
 //   tls.Connect("device.example.com", 443);
 // Build target: example_mtls_client.
+#include "etlx/net/tcp_socket.hpp"
 #include "etlx/net/tls.hpp"
-#include "host/host_tcp.hpp"
 #include "tests/net/test_certs.hpp"
 
 #include <cstdio>
@@ -97,9 +97,10 @@ int main() {
     const uint16_t port = ntohs(addr.sin_port);
     std::thread server(RunServer, listen_fd);
 
-    // Client: TLS over TCP, presenting a client certificate for mutual auth.
-    etlx::ports::host::PosixTcpSocket tcp;
-    etlx::net::TlsSocket             tls(tcp);
+    // Client: TLS over the selected TCP transport (posix or asio), presenting a
+    // client certificate for mutual auth.
+    etlx::net::TcpSocket tcp;
+    etlx::net::TlsSocket tls(tcp);
 
     etlx::net::TlsConfig cfg;
     cfg.ca_cert_pem     = etlx_test_certs::kCaCertPem;      // verify the server

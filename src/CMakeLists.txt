@@ -6,6 +6,9 @@ add_library(etlx
   conf/cli.cpp
   storage/kv.cpp
   json/json.cpp
+  crypto/crypto.cpp
+  crypto/sha256.cpp
+  crypto/hmac.cpp
 )
 
 add_library(etlx::etlx ALIAS etlx)

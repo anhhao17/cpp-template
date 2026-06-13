@@ -51,6 +51,22 @@ if(ETLX_TRANSPORT STREQUAL "asio")
   target_compile_definitions(etlx_boost_asio INTERFACE BOOST_ASIO_NO_DEPRECATED)
 endif()
 
+# NXP Plug & Trust (SE05x middleware), fetched from source like the rest. We
+# only download/extract here (SOURCE_SUBDIR points at a non-existent dir so its
+# own top-level CMake never runs); ports/se05x consumes its simw_lib.cmake to
+# build a curated static lib against our mbedTLS. Pinned to the commit used by
+# the upstream SE051 project.
+if(ETLX_WITH_SE05X)
+  FetchContent_Declare(
+    plugandtrust
+    GIT_REPOSITORY https://github.com/NXP/plug-and-trust.git
+    GIT_TAG        1ddf8cf0cdf9d7f77e32d7e62b19b6a58d74f5fa
+    GIT_SHALLOW    FALSE
+    SOURCE_SUBDIR  __no_top_level_build__
+  )
+  FetchContent_MakeAvailable(plugandtrust)
+endif()
+
 # GoogleTest, used by the host unit tests only.
 if(ETLX_BUILD_TESTS)
   FetchContent_Declare(

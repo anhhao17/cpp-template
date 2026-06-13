@@ -12,6 +12,15 @@ option(ETLX_BUILD_EXAMPLES "Build per-module example programs"  ON)
 option(ETLX_BUILD_DEMOCLI  "Build the democli example app"      ON)
 option(ETLX_NO_EXCEPTIONS  "Compile library/app code with -fno-exceptions -fno-rtti" ON)
 option(ETLX_WITH_TLS       "Build the TLS/mTLS support (fetches mbedTLS from source)" ON)
+option(ETLX_WITH_SE05X     "Build the NXP SE05x secure-element port (fetches plug-and-trust)" OFF)
+
+if(ETLX_WITH_SE05X AND NOT ETLX_WITH_TLS)
+  message(FATAL_ERROR "ETLX_WITH_SE05X requires ETLX_WITH_TLS (SE05x host-crypto uses mbedTLS)")
+endif()
+# The SE05x port compiles NXP's C middleware, so enable the C language for it.
+if(ETLX_WITH_SE05X)
+  enable_language(C)
+endif()
 
 # Exactly one TCP transport backend is compiled in, chosen here. 'posix' is the
 # lean default; 'asio' fetches Boost and builds the Boost.Asio backend instead.
@@ -73,6 +82,9 @@ endif()
 # The library, ports, apps, examples and tests.
 add_subdirectory(src)
 add_subdirectory(ports/host)
+if(ETLX_WITH_SE05X)
+  add_subdirectory(ports/se05x)
+endif()
 
 # Select the single TCP transport. etlx::transport is the one consumers link;
 # it pulls in exactly one backend and defines ETLX_TRANSPORT_ASIO so the

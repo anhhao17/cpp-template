@@ -51,4 +51,9 @@
 #define ETLX_KV_VALUE_CAPACITY 128
 #endif
 
+// Maximum number of headers in an HTTP request or parsed response.
+#ifndef ETLX_HTTP_MAX_HEADERS
+#define ETLX_HTTP_MAX_HEADERS 16
+#endif
+
 #endif // ETLX_CONFIG_HPP

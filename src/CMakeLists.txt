@@ -9,6 +9,8 @@ add_library(etlx
   crypto/crypto.cpp
   crypto/sha256.cpp
   crypto/hmac.cpp
+  net/net.cpp
+  http/http.cpp
 )
 
 add_library(etlx::etlx ALIAS etlx)

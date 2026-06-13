@@ -3,6 +3,7 @@ add_library(etlx_host
   host_io.cpp
   host_kv.cpp
   host_random.cpp
+  host_tcp.cpp
 )
 
 add_library(etlx::host ALIAS etlx_host)

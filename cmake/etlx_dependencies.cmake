@@ -27,6 +27,30 @@ if(ETLX_WITH_TLS)
   FetchContent_MakeAvailable(mbedtls)
 endif()
 
+# Boost.Asio host transport. We fetch the official Boost source release (same
+# tarball + hash pattern as mbedTLS) but use Asio HEADER-ONLY: SOURCE_SUBDIR
+# points at a non-existent directory so FetchContent only downloads/extracts and
+# never add_subdirectory()s Boost's own build. An INTERFACE target exposes the
+# include path. This cross-compiles to aarch64 with no Boost build step.
+if(ETLX_WITH_ASIO)
+  FetchContent_Declare(
+    boost
+    URL      https://archives.boost.io/release/1.91.0/source/boost_1_91_0.tar.bz2
+    URL_HASH SHA256=de5e6b0e4913395c6bdfa90537febd9028ea4c0735d2cdb0cd9b45d5f51264f5
+    SOURCE_SUBDIR  __header_only_no_build__
+  )
+  FetchContent_MakeAvailable(boost)
+
+  find_package(Threads REQUIRED)
+  add_library(etlx_boost_asio INTERFACE)
+  target_include_directories(etlx_boost_asio SYSTEM INTERFACE ${boost_SOURCE_DIR})
+  target_link_libraries(etlx_boost_asio INTERFACE Threads::Threads)
+  # Asio is header-only by default; we must NOT define
+  # BOOST_ASIO_SEPARATE_COMPILATION (even to 0), or it expects a separately
+  # compiled src.cpp.
+  target_compile_definitions(etlx_boost_asio INTERFACE BOOST_ASIO_NO_DEPRECATED)
+endif()
+
 # GoogleTest, used by the host unit tests only.
 if(ETLX_BUILD_TESTS)
   FetchContent_Declare(

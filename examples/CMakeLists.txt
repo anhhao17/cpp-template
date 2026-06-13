@@ -18,6 +18,14 @@ etlx_add_example(http_get)
 etlx_add_example(update_fsm)
 etlx_add_example(event_loop)
 
+# The Asio transport example.
+if(ETLX_WITH_ASIO)
+  add_executable(example_asio_http_get asio_http_get/main.cpp)
+  target_include_directories(example_asio_http_get PRIVATE ${CMAKE_SOURCE_DIR})
+  target_link_libraries(example_asio_http_get
+    PRIVATE etlx::asio etlx_embedded_flags)
+endif()
+
 # The mTLS example needs the TLS library and threads.
 if(ETLX_WITH_TLS)
   add_executable(example_mtls_client mtls_client/main.cpp)

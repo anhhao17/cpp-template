@@ -54,6 +54,7 @@ Override the cross prefix for a vendor SDK with
 | `include/etlx/` | public headers: `core`, `io`, `log`, `conf`, `storage`, `json`, `crypto`, `net`, `http`, `events`, `sm` |
 | `src/` | platform-independent implementations |
 | `ports/host/` | host backends: stdout/stderr io+log, file KV store, `/dev/urandom`, POSIX TCP, monotonic clock |
+| `ports/asio/` | Boost.Asio TCP transport (`net::Socket`), optional (`ETLX_WITH_ASIO`) |
 | `apps/democli/` | demo OTA-style CLI built on the template (install drives the real update FSM) |
 | `examples/` | one runnable `main()` per module |
 | `tests/` | GoogleTest host/qemu unit tests (73 cases) |
@@ -106,3 +107,29 @@ is fetched and built from source** by CMake — it is *not* taken from the syste
 — so the cross-aarch64 build needs no TLS library in its sysroot. The HTTP
 parser and the SHA-256/HMAC primitives remain dependency-free software
 implementations; their interfaces are swappable (e.g. an llhttp port).
+
+### Boost.Asio transport (optional)
+
+For parity with the real Mender client (whose HTTP layer is built on
+Boost.Asio/Beast), `ports/asio` provides `AsioTcpSocket`, an alternative
+`net::Socket` backend for host/Linux targets. Because it implements the same
+interface, it drops into `http::Client` unchanged and can be wrapped by
+`net::TlsSocket` for **mutual TLS over an Asio transport** (the mTLS stack stays
+on mbedTLS — no OpenSSL/`asio::ssl` needed):
+
+```cpp
+etlx::ports::asio::AsioTcpSocket transport;
+etlx::net::TlsSocket            tls(transport);   // same TlsSocket as over POSIX
+tls.Configure(cfg);                               // cfg carries client cert/key
+tls.Connect("device.example.com", 443);
+```
+
+Built only when `-DETLX_WITH_ASIO=ON` (the default). **Boost 1.91.0 is fetched
+from source** (release tarball + SHA256, same pattern as mbedTLS) and used
+**header-only** — CMake never runs Boost's own build (`SOURCE_SUBDIR` trick), so
+it cross-compiles to aarch64 with no Boost build step and no Boost in the
+sysroot. Boost headers are confined to the port's `.cpp` via a PIMPL, so
+including `asio/asio_tcp.hpp` does not pull Boost into the rest of the build.
+See `example_asio_http_get` (Asio + http) and `test_asio` (TCP round-trip +
+mutual TLS over Asio). Turn it off with `-DETLX_WITH_ASIO=OFF` to avoid the
+large Boost download.

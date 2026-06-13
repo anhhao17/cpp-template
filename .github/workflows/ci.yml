@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install tools
-        run: sudo apt-get install -y cmake ninja-build
+        run: sudo apt-get install -y cmake ninja-build netcat-openbsd
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build
@@ -82,6 +82,10 @@ jobs:
         env:
           EX_SSS_BOOT_SSS_PORT: "127.0.0.1:8050"
         run: ctest --preset se05x-sim --output-on-failure
+      - name: Smoke-test se_mtls_client (software fallback)
+        # EX_SSS_BOOT_SSS_PORT intentionally unset — SE key won't match the
+        # software test cert, so software fallback is the correct path here.
+        run: ./build/se05x-sim/examples/example_se_mtls_client
       - name: Stop simulator
         if: always()
         run: kill $SIM_PID 2>/dev/null || true

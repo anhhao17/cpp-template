@@ -56,4 +56,13 @@
 #define ETLX_HTTP_MAX_HEADERS 16
 #endif
 
+// Event loop sizing: immediate-callback queue depth and pending-timer count.
+#ifndef ETLX_EVENTS_QUEUE_DEPTH
+#define ETLX_EVENTS_QUEUE_DEPTH 16
+#endif
+
+#ifndef ETLX_EVENTS_MAX_TIMERS
+#define ETLX_EVENTS_MAX_TIMERS 8
+#endif
+
 #endif // ETLX_CONFIG_HPP

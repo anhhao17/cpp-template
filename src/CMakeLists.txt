@@ -11,6 +11,8 @@ add_library(etlx
   crypto/hmac.cpp
   net/net.cpp
   http/http.cpp
+  events/loop.cpp
+  sm/update_fsm.cpp
 )
 
 add_library(etlx::etlx ALIAS etlx)

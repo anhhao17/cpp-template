@@ -2,6 +2,7 @@
 
 #include "etlx/conf/cli.hpp"
 #include "etlx/log/log.hpp"
+#include "etlx/sm/update_fsm.hpp"
 
 #include <cstdint>
 
@@ -47,21 +48,27 @@ etlx::error::Error InstallAction::Execute(Context& ctx) {
     Put(ctx, etl::string_view{artifact_.data(), artifact_.size()});
     Put(ctx, "\n");
 
-    // The real workflow drives the update FSM (download -> verify -> install).
-    // Here we walk the states textually and honour --stop-before.
-    static constexpr etl::string_view states[] = {"download", "verify", "install"};
-    for (auto state : states) {
+    // Drive the real update FSM. Start moves Idle -> Download; each phase is
+    // performed and then Step() advances the machine. --stop-before halts by
+    // simply not sending the next event.
+    etlx::sm::UpdateFsm fsm;
+    fsm.Start();  // -> Download
+
+    static constexpr etl::string_view phases[] = {"download", "verify", "install"};
+    for (auto phase : phases) {
         if (!stop_before_.empty() &&
-            etl::string_view{stop_before_.data(), stop_before_.size()} == state) {
+            etl::string_view{stop_before_.data(), stop_before_.size()} == phase) {
             Put(ctx, "stopping before ");
-            Put(ctx, state);
+            Put(ctx, phase);
             Put(ctx, "\n");
             return etlx::error::NoError;
         }
         Put(ctx, "  ");
-        Put(ctx, state);
+        Put(ctx, phase);
         Put(ctx, " ok\n");
+        fsm.Step();  // advance to the next workflow state
     }
+    // Machine is now at AwaitCommit, awaiting a reboot + commit/rollback.
     Put(ctx, "install complete; reboot required\n");
     return ExitWith(ExitRebootNeeded, "reboot required");
 }

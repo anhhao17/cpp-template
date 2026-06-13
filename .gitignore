@@ -1,0 +1,20 @@
+# Build directories
+/build/
+/out/
+build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Fetched dependencies (managed by FetchContent)
+/_deps/

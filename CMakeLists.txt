@@ -1,0 +1,77 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(etlx
+  VERSION     0.1.0
+  DESCRIPTION "Embedded C++ template library (ETL-based), Mender-style CLI + services"
+  LANGUAGES   CXX
+)
+
+# Build options.
+option(ETLX_BUILD_TESTS    "Build host unit tests (GoogleTest)" ON)
+option(ETLX_BUILD_EXAMPLES "Build per-module example programs"  ON)
+option(ETLX_BUILD_DEMOCLI  "Build the democli example app"      ON)
+option(ETLX_NO_EXCEPTIONS  "Compile library/app code with -fno-exceptions -fno-rtti" ON)
+
+# Tests pull in GoogleTest which relies on exceptions/RTTI; when cross-compiling
+# for aarch64 they still run under qemu, so keep them on by default everywhere.
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+enable_testing()
+
+# Dependencies (ETL, GoogleTest) via FetchContent.
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(etlx_dependencies)
+
+# Shared interface target carrying the compile flags and ETL config that every
+# etlx translation unit needs.
+add_library(etlx_flags INTERFACE)
+
+target_compile_features(etlx_flags INTERFACE cxx_std_17)
+
+# No-heap / no-exceptions design contract from the README. ETL_NO_EXCEPTIONS
+# makes ETL report errors through its assert handler instead of throwing.
+target_compile_definitions(etlx_flags INTERFACE ETL_NO_EXCEPTIONS)
+
+target_compile_options(etlx_flags INTERFACE
+  $<$<COMPILE_LANGUAGE:CXX>:-Wall>
+  $<$<COMPILE_LANGUAGE:CXX>:-Wextra>
+)
+
+if(ETLX_TARGET_AARCH64)
+  message(STATUS "etlx: cross-compiling for aarch64-linux-gnu")
+else()
+  message(STATUS "etlx: building for native host")
+endif()
+
+# A second interface target carrying the strict embedded flags. Library/app
+# code uses it; test code does not (GoogleTest needs exceptions/RTTI).
+add_library(etlx_embedded_flags INTERFACE)
+if(ETLX_NO_EXCEPTIONS)
+  target_compile_options(etlx_embedded_flags INTERFACE
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
+  )
+endif()
+
+# The library, ports, apps, examples and tests.
+add_subdirectory(src)
+add_subdirectory(ports/host)
+
+if(ETLX_BUILD_DEMOCLI)
+  add_subdirectory(apps/democli)
+endif()
+
+if(ETLX_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+
+if(ETLX_BUILD_TESTS)
+  add_subdirectory(tests)
+endif()

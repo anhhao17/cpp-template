@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ── native (host): full build + test suite ─────────────────────────────────
+  native:
+    name: native (${{ matrix.preset }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [ native, native-asan ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get install -y cmake ninja-build
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build
+        run: cmake --build build/${{ matrix.preset }}
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+
+  # ── SE05x port: build-only (no hardware in CI) ────────────────────────────
+  se05x-build:
+    name: SE05x build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get install -y cmake ninja-build
+      - name: Configure (SE05x + examples, tests off)
+        run: |
+          cmake -S . -B build/se05x -G Ninja \
+            -DETLX_WITH_SE05X=ON \
+            -DETLX_BUILD_TESTS=OFF \
+            -DETLX_BUILD_EXAMPLES=ON \
+            -DETLX_BUILD_DEMOCLI=OFF
+      - name: Build
+        run: cmake --build build/se05x
+      - name: Smoke-test se_mtls_client (software fallback, no SE hardware)
+        run: |
+          # EX_SSS_BOOT_SSS_PORT not set → software key fallback, should exit 0
+          ./build/se05x/examples/example_se_mtls_client
+
+  # ── Boost.Asio transport ─────────────────────────────────────────────────
+  asio:
+    name: Asio transport
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get install -y cmake ninja-build
+      - name: Configure (Asio transport)
+        run: |
+          cmake -S . -B build/asio -G Ninja \
+            -DETLX_TRANSPORT=asio \
+            -DETLX_BUILD_TESTS=ON \
+            -DETLX_BUILD_EXAMPLES=ON
+      - name: Build
+        run: cmake --build build/asio
+      - name: Test
+        run: ctest --test-dir build/asio --output-on-failure
+
+  # ── aarch64 cross-compile + qemu ─────────────────────────────────────────
+  aarch64:
+    name: aarch64 cross + qemu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get install -y cmake ninja-build \
+            g++-aarch64-linux-gnu qemu-user-static
+      - name: Configure
+        run: cmake --preset aarch64
+      - name: Build
+        run: cmake --build build/aarch64
+      - name: Test (under qemu)
+        run: ctest --preset aarch64 --output-on-failure

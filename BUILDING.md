@@ -57,7 +57,9 @@ Override the cross prefix for a vendor SDK with
 | `ports/asio/` | Boost.Asio TCP transport (`net::Socket`), optional (`ETLX_WITH_ASIO`) |
 | `apps/democli/` | demo OTA-style CLI built on the template (install drives the real update FSM) |
 | `examples/` | one runnable `main()` per module |
-| `tests/` | GoogleTest host/qemu unit tests (73 cases) |
+| `ports/se05x/` | NXP SE05x secure-element port (keygen, sign, SCP03), optional (`ETLX_WITH_SE05X`) |
+| `apps/se_factory/` | factory provisioning CLI (`provision`, `write-cert`, `rotate-scp03`, …) |
+| `tests/` | GoogleTest host/qemu unit tests (77 cases) |
 
 ## Modules
 
@@ -108,6 +110,59 @@ is fetched and built from source** by CMake — it is *not* taken from the syste
 parser and the SHA-256/HMAC primitives remain dependency-free software
 implementations; their interfaces are swappable (e.g. an llhttp port).
 
+### SE05x secure-element port (optional)
+
+`ports/se05x` adds support for the NXP SE050/SE051/SE052 secure element family
+via NXP's Plug & Trust SSS middleware (fetched from source at configure time).
+Enable it with `-DETLX_WITH_SE05X=ON` (requires `-DETLX_WITH_TLS=ON`, the
+default):
+
+```sh
+cmake -S . -B build/se05x -G Ninja \
+  -DETLX_WITH_SE05X=ON \
+  -DETLX_BUILD_TESTS=OFF   # unit tests do not need hardware
+cmake --build build/se05x
+```
+
+The port exposes a C++ façade over the SSS API:
+
+| Class | What it does |
+|---|---|
+| `se::Connection` | RAII session owner (`ex_sss_boot_ctx_t`); Platform SCP03 |
+| `se::RsaKey` | RSA-2048/4096 keygen, sign (PKCS#1-v1.5-SHA256), CSR generation |
+| `se::ObjectStore` | read/write binary blobs and DER certificates; chip UID |
+| `se::Scp03Admin` | GP PUT KEY rotation; atomic key-file update |
+| `se::SetupOpaquePk` | wire SE key into `mbedtls_pk_context` for `net::TlsSocket` |
+
+**Factory provisioning** (`apps/se_factory`) provides seven commands:
+`provision`, `write-cert`, `write-info`, `read-info`, `rotate-scp03`,
+`uid`, and `verify`.  All commands require `EX_SSS_BOOT_SCP03_PATH`.
+
+**SE-backed mTLS** — once a device is provisioned, the client's RSA private
+key never leaves the chip during a TLS handshake:
+
+```cpp
+etlx::se::Connection conn = etlx::se::Connection::Open(nullptr).value();
+etlx::se::RsaKey     key  = etlx::se::RsaKey::Open(conn, kRsaKeyId).value();
+
+mbedtls_pk_context opaque;
+mbedtls_pk_init(&opaque);
+etlx::se::SetupOpaquePk(opaque, key);   // signing goes through the SE
+
+etlx::net::TlsSocket tls(tcp);
+tls.UseExternalKey(opaque);             // inject before Configure()
+
+etlx::net::TlsConfig cfg;
+cfg.ca_cert_pem     = ca_pem;
+cfg.client_cert_pem = cert_pem;         // cert signed by your CA
+// client_key_pem intentionally left empty — SE key is used
+tls.Configure(cfg);
+tls.Connect("device.example.com", 443);
+```
+
+See `examples/se_mtls_client` for the full demo (software fallback when
+`EX_SSS_BOOT_SSS_PORT` is not set, so it runs in CI without hardware).
+
 ### Boost.Asio transport (optional)
 
 For parity with the real Mender client (whose HTTP layer is built on
@@ -124,12 +179,12 @@ tls.Configure(cfg);                               // cfg carries client cert/key
 tls.Connect("device.example.com", 443);
 ```
 
-Built only when `-DETLX_WITH_ASIO=ON` (the default). **Boost 1.91.0 is fetched
+Built only when `-DETLX_TRANSPORT=asio` (the default). **Boost 1.91.0 is fetched
 from source** (release tarball + SHA256, same pattern as mbedTLS) and used
 **header-only** — CMake never runs Boost's own build (`SOURCE_SUBDIR` trick), so
 it cross-compiles to aarch64 with no Boost build step and no Boost in the
 sysroot. Boost headers are confined to the port's `.cpp` via a PIMPL, so
 including `asio/asio_tcp.hpp` does not pull Boost into the rest of the build.
 See `example_asio_http_get` (Asio + http) and `test_asio` (TCP round-trip +
-mutual TLS over Asio). Turn it off with `-DETLX_WITH_ASIO=OFF` to avoid the
+mutual TLS over Asio). Turn it off with `-DETLX_TRANSPORT=posix` to avoid the
 large Boost download.

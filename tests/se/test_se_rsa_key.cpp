@@ -82,16 +82,18 @@ TEST_F(SeRsaKeyTest, Sign_ProducesRsa2048Length) {
 TEST_F(SeRsaKeyTest, Verify_AcceptsOwnSignature) {
     auto sig = Key().Sign(kTestDigest, sizeof(kTestDigest));
     ASSERT_TRUE(sig.has_value());
-    EXPECT_TRUE(Key().Verify(kTestDigest, sizeof(kTestDigest),
-                              sig->data(), sig->size()));
+    auto v = Key().Verify(kTestDigest, sizeof(kTestDigest), sig->data(), sig->size());
+    ASSERT_TRUE(v.has_value()) << "Verify hardware error";
+    EXPECT_TRUE(v.value());
 }
 
 TEST_F(SeRsaKeyTest, Verify_RejectsWrongDigest) {
     auto sig = Key().Sign(kTestDigest, sizeof(kTestDigest));
     ASSERT_TRUE(sig.has_value());
     // Signature over kTestDigest must not verify against kOtherDigest.
-    EXPECT_FALSE(Key().Verify(kOtherDigest, sizeof(kOtherDigest),
-                               sig->data(), sig->size()));
+    auto v = Key().Verify(kOtherDigest, sizeof(kOtherDigest), sig->data(), sig->size());
+    ASSERT_TRUE(v.has_value()) << "Verify hardware error";
+    EXPECT_FALSE(v.value());
 }
 
 TEST_F(SeRsaKeyTest, Verify_RejectsCorruptedSignature) {
@@ -99,8 +101,9 @@ TEST_F(SeRsaKeyTest, Verify_RejectsCorruptedSignature) {
     ASSERT_TRUE(sig.has_value());
     // Flip one bit in the signature.
     (*sig)[0] ^= 0x01u;
-    EXPECT_FALSE(Key().Verify(kTestDigest, sizeof(kTestDigest),
-                               sig->data(), sig->size()));
+    auto v = Key().Verify(kTestDigest, sizeof(kTestDigest), sig->data(), sig->size());
+    ASSERT_TRUE(v.has_value()) << "Verify hardware error";
+    EXPECT_FALSE(v.value());
 }
 
 TEST_F(SeRsaKeyTest, PublicKeyDer_HasRsa2048SpkiSize) {

@@ -44,8 +44,10 @@ public:
     Result<SigBytes> Sign(const uint8_t *digest, size_t digest_len);
 
     // Verify a PKCS#1 v1.5 signature over a SHA-256 digest.
-    bool Verify(const uint8_t *digest, size_t digest_len,
-                const uint8_t *sig, size_t sig_len);
+    // Returns an error if the SE hardware fails; returns false if the signature
+    // is simply invalid (distinguishes hardware fault from bad signature).
+    Result<bool> Verify(const uint8_t *digest, size_t digest_len,
+                        const uint8_t *sig, size_t sig_len);
 
     // Export the RSA public key as DER SubjectPublicKeyInfo.
     Result<SpkiDer> PublicKeyDer();

@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 
 extern "C" {
 #include <ex_sss_boot.h>
@@ -32,8 +33,7 @@ inline Unexpected<> SeFail(SeError code, etl::string_view msg) {
 }
 
 // RAII owner of the SSS boot context lifecycle (open + keystore init + close).
-// Wraps ex_sss_boot_ctx_t directly.  Non-copyable; move-only so it can be
-// returned from the Open() factory without extra indirection.
+// Non-copyable; move-only so it can be returned from the Open() factory.
 //
 // This is a hosted-OS class (heap/OS calls are acceptable) matching the
 // ports/asio design — it is NOT compiled with etlx_embedded_flags.
@@ -54,23 +54,18 @@ public:
     Connection(const Connection &) = delete;
     Connection &operator=(const Connection &) = delete;
 
-    Connection(Connection &&o) noexcept : ctx_(o.ctx_), opened_(o.opened_) {
-        o.opened_ = false;
-        std::memset(&o.ctx_, 0, sizeof(o.ctx_));
-        if (ctx_.ks.session != nullptr)
-            ctx_.ks.session = &ctx_.session;
-    }
-
+    Connection(Connection &&o) noexcept
+        : ctx_(std::move(o.ctx_)), opened_(std::exchange(o.opened_, false)) {}
     Connection &operator=(Connection &&) = delete;
 
-    sss_session_t *session() { return &ctx_.session; }
-    sss_key_store_t *keystore() { return &ctx_.ks; }
-    ex_sss_boot_ctx_t *boot_ctx() { return &ctx_; }
+    sss_session_t *session() { return &ctx_->session; }
+    sss_key_store_t *keystore() { return &ctx_->ks; }
+    ex_sss_boot_ctx_t *boot_ctx() { return ctx_.get(); }
 
 private:
-    Connection() = default;
+    Connection() : ctx_(std::make_unique<ex_sss_boot_ctx_t>()) {}
 
-    ex_sss_boot_ctx_t ctx_{};
+    std::unique_ptr<ex_sss_boot_ctx_t> ctx_;
     bool opened_ = false;
 };
 

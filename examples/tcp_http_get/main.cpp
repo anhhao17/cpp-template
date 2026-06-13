@@ -1,13 +1,14 @@
 // Example: drive the etlx http::Client over the selected TCP transport. A tiny
 // loopback HTTP server returns a canned response; the client connects with an
-// etlx::net::TcpSocket -- which is the POSIX socket or the Boost.Asio socket
-// depending on the build-time ETLX_TRANSPORT setting -- issues a GET, and the
-// response is parsed by the same bounded http parser. Swapping the transport
-// needs no source change. Build target: example_tcp_http_get.
+// etlx::net::TcpSocket -- the POSIX socket or the Boost.Asio socket depending
+// on the build-time ETLX_TRANSPORT setting -- issues a GET, and the response is
+// parsed by the same bounded http parser. Swapping the transport needs no
+// source change. Output via etlx::log. Build target: example_tcp_http_get.
 #include "etlx/http/http.hpp"
+#include "etlx/log/log.hpp"
 #include "etlx/net/tcp_socket.hpp"
+#include "host/host_io.hpp"
 
-#include <cstdio>
 #include <cstring>
 #include <thread>
 
@@ -37,6 +38,9 @@ void RunHttpServer(int listen_fd) {
 } // namespace
 
 int main() {
+    static etlx::ports::host::StderrLogSink sink;
+    etlx::log::SetSink(&sink);
+
     int listen_fd = ::socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in addr{};
     addr.sin_family      = AF_INET;
@@ -52,18 +56,18 @@ int main() {
     etlx::net::TcpSocket sock;
     int rc = 1;
     if (auto c = sock.Connect("127.0.0.1", port); !c) {
-        std::printf("connect failed: %s\n", c.error().message.c_str());
+        ETLX_LOG_ERROR("connect failed: %s", c.error().message.c_str());
     } else {
         etlx::http::Client client;
         uint8_t buf[512];
         auto resp = client.Get(sock, "127.0.0.1", "/health", etlx::ByteSpan{buf, sizeof(buf)});
         if (!resp) {
-            std::printf("http error: %s\n", resp.error().message.c_str());
+            ETLX_LOG_ERROR("http error: %s", resp.error().message.c_str());
         } else {
-            std::printf("status: %d %.*s\n", resp.value().status,
-                        static_cast<int>(resp.value().reason.size()), resp.value().reason.data());
-            std::printf("body:   %.*s\n", static_cast<int>(resp.value().body.size()),
-                        reinterpret_cast<const char*>(resp.value().body.data()));
+            ETLX_LOG_INFO("status: %d %.*s", resp.value().status,
+                          static_cast<int>(resp.value().reason.size()), resp.value().reason.data());
+            ETLX_LOG_INFO("body:   %.*s", static_cast<int>(resp.value().body.size()),
+                          reinterpret_cast<const char*>(resp.value().body.data()));
             rc = 0;
         }
     }

@@ -19,14 +19,16 @@ etlx_add_example(update_fsm)
 etlx_add_example(event_loop)
 
 # Live HTTP over the selected TCP transport (POSIX or Asio).
+# etlx::host provides the log sink (not transitive via the asio transport).
 add_executable(example_tcp_http_get tcp_http_get/main.cpp)
 target_include_directories(example_tcp_http_get PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(example_tcp_http_get PRIVATE etlx::transport etlx_embedded_flags)
+target_link_libraries(example_tcp_http_get
+  PRIVATE etlx::transport etlx::host etlx_embedded_flags)
 
 # The mTLS example: TLS over the selected transport.
 if(ETLX_WITH_TLS)
   add_executable(example_mtls_client mtls_client/main.cpp)
   target_include_directories(example_mtls_client PRIVATE ${CMAKE_SOURCE_DIR})
   target_link_libraries(example_mtls_client
-    PRIVATE etlx::tls etlx::transport etlx_embedded_flags)
+    PRIVATE etlx::tls etlx::transport etlx::host etlx_embedded_flags)
 endif()

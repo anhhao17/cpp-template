@@ -1,11 +1,16 @@
 // Example: parse a small config/manifest blob into fields with no heap. The
 // token array lives on the stack; the Json view navigates it by reference.
-// Build target: example_json_config.
+// Output via etlx::log. Build target: example_json_config.
 #include "etlx/json/json.hpp"
+#include "etlx/log/log.hpp"
+#include "host/host_io.hpp"
 
-#include <cstdio>
+#include <etl/string.h>
 
 int main() {
+    static etlx::ports::host::StderrLogSink sink;
+    etlx::log::SetSink(&sink);
+
     static const char kManifest[] =
         "{"
         "  \"artifact_name\": \"device-image-1.1.0\","
@@ -17,25 +22,26 @@ int main() {
     etlx::json::Token tokens[32];
     auto root = etlx::json::ParseToView(kManifest, etlx::Span<etlx::json::Token>{tokens, 32});
     if (!root) {
-        std::printf("parse error: %s\n", root.error().message.c_str());
+        ETLX_LOG_ERROR("parse error: %s", root.error().message.c_str());
         return 1;
     }
 
     const etlx::json::Json& doc = root.value();
-    auto name    = doc["artifact_name"].AsString();
-    auto version = doc["version"].AsInt();
+    auto name      = doc["artifact_name"].AsString();
+    auto version   = doc["version"].AsInt();
     auto is_signed = doc["signed"].AsBool();
 
-    std::printf("artifact_name = %.*s\n", static_cast<int>(name.size()), name.data());
-    if (version)   std::printf("version       = %lld\n", static_cast<long long>(version.value()));
-    if (is_signed) std::printf("signed        = %s\n", is_signed.value() ? "yes" : "no");
+    ETLX_LOG_INFO("artifact_name = %.*s", static_cast<int>(name.size()), name.data());
+    if (version)   ETLX_LOG_INFO("version       = %lld", static_cast<long long>(version.value()));
+    if (is_signed) ETLX_LOG_INFO("signed        = %s", is_signed.value() ? "yes" : "no");
 
     auto compatible = doc["compatible"];
-    std::printf("compatible    = %zu entries:", compatible.size());
+    etl::string<64> list;
     for (size_t i = 0; i < compatible.size(); ++i) {
         auto e = compatible[i].AsString();
-        std::printf(" %.*s", static_cast<int>(e.size()), e.data());
+        if (i) list.append(", ");
+        list.append(e.data(), e.size());
     }
-    std::printf("\n");
+    ETLX_LOG_INFO("compatible    = %zu entries: %s", compatible.size(), list.c_str());
     return 0;
 }

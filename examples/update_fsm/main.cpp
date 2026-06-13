@@ -1,21 +1,24 @@
 // Example: drive the update state machine through install -> commit, and show
 // that an illegal event (committing before install finishes) is ignored.
-// Build target: example_update_fsm.
+// Output via etlx::log. Build target: example_update_fsm.
+#include "etlx/log/log.hpp"
 #include "etlx/sm/update_fsm.hpp"
-
-#include <cstdio>
+#include "host/host_io.hpp"
 
 namespace {
 
 void Show(const char* what, etlx::sm::UpdateFsm& fsm) {
-    std::printf("%-26s -> %s\n", what, fsm.state_name());
+    ETLX_LOG_INFO("%-26s -> %s", what, fsm.state_name());
 }
 
 } // namespace
 
 int main() {
+    static etlx::ports::host::StderrLogSink sink;
+    etlx::log::SetSink(&sink);
+
     etlx::sm::UpdateFsm fsm;
-    std::printf("initial                    -> %s\n", fsm.state_name());
+    ETLX_LOG_INFO("%-26s -> %s", "initial", fsm.state_name());
 
     // Illegal: cannot commit before the workflow reaches AwaitCommit.
     fsm.Commit();
@@ -27,7 +30,7 @@ int main() {
     Show("Step",   (fsm.Step(),   fsm));   // AwaitCommit
     Show("Commit", (fsm.Commit(), fsm));   // Done
 
-    std::printf("\n--- second run: rollback path ---\n");
+    ETLX_LOG_INFO("--- second run: rollback path ---");
     etlx::sm::UpdateFsm fsm2;
     fsm2.Start();
     fsm2.Step();   // Verify

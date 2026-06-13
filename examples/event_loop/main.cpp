@@ -1,21 +1,25 @@
 // Example: schedule work on the cooperative event loop. Uses a SimulatedClock
 // so the run is deterministic and instant; swap in
 // ports::host::MonotonicClock for real wall-clock timing (e.g. a daemon's
-// periodic check-update tick). Build target: example_event_loop.
+// periodic check-update tick). Output via etlx::log. Build target:
+// example_event_loop.
 #include "etlx/events/loop.hpp"
-
-#include <cstdio>
+#include "etlx/log/log.hpp"
+#include "host/host_io.hpp"
 
 namespace {
 
 int g_ticks = 0;
 
-void OnImmediate() { std::printf("immediate callback ran\n"); }
-void OnTick()      { std::printf("tick %d fired\n", ++g_ticks); }
+void OnImmediate() { ETLX_LOG_INFO("immediate callback ran"); }
+void OnTick()      { ETLX_LOG_INFO("tick %d fired", ++g_ticks); }
 
 } // namespace
 
 int main() {
+    static etlx::ports::host::StderrLogSink sink;
+    etlx::log::SetSink(&sink);
+
     etlx::time::SimulatedClock clock;
     etlx::events::EventLoop    loop(clock);
 
@@ -24,8 +28,8 @@ int main() {
     loop.PostAfter(etlx::time::Seconds(3), etlx::events::Callback::create<OnTick>());
     loop.PostAfter(etlx::time::Seconds(2), etlx::events::Callback::create<OnTick>());
 
-    std::printf("running loop with %zu timers...\n", loop.pending_timers());
+    ETLX_LOG_INFO("running loop with %zu timers...", loop.pending_timers());
     loop.Run();  // returns once every timer has fired
-    std::printf("loop idle after %d ticks\n", g_ticks);
+    ETLX_LOG_INFO("loop idle after %d ticks", g_ticks);
     return 0;
 }

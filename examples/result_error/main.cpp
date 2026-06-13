@@ -1,8 +1,8 @@
 // Example: propagating Result<T> / Status / Error across calls without
-// exceptions. Build target: example_result_error.
+// exceptions. Output goes through etlx::log. Build target: example_result_error.
 #include "etlx/core/result.hpp"
-
-#include <cstdio>
+#include "etlx/log/log.hpp"
+#include "host/host_io.hpp"
 
 namespace {
 
@@ -26,18 +26,22 @@ etlx::Result<uint32_t> ParseU32(etl::string_view s) {
 void Try(etl::string_view in) {
     auto r = ParseU32(in);
     if (r) {
-        std::printf("ok:    \"%.*s\" -> %u\n", static_cast<int>(in.size()),
-                    in.data(), r.value());
+        ETLX_LOG_INFO("ok:    \"%.*s\" -> %u",
+                      static_cast<int>(in.size()), in.data(), r.value());
     } else {
-        std::printf("error: \"%.*s\" -> [%s/%d] %s\n", static_cast<int>(in.size()),
-                    in.data(), r.error().category->name, r.error().code,
-                    r.error().message.c_str());
+        ETLX_LOG_ERROR("error: \"%.*s\" -> [%s/%d] %s",
+                       static_cast<int>(in.size()), in.data(),
+                       r.error().category->name, r.error().code,
+                       r.error().message.c_str());
     }
 }
 
 } // namespace
 
 int main() {
+    static etlx::ports::host::StderrLogSink sink;
+    etlx::log::SetSink(&sink);
+
     Try("42");
     Try("");
     Try("12x4");

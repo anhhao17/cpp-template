@@ -7,11 +7,12 @@
 // To talk to a real endpoint instead, drop the server and call
 //   tls.Connect("device.example.com", 443);
 // Build target: example_mtls_client.
+#include "etlx/log/log.hpp"
 #include "etlx/net/tcp_socket.hpp"
 #include "etlx/net/tls.hpp"
+#include "host/host_io.hpp"
 #include "tests/net/test_certs.hpp"
 
-#include <cstdio>
 #include <cstring>
 #include <thread>
 
@@ -85,6 +86,9 @@ void RunServer(int listen_fd) {
 } // namespace
 
 int main() {
+    static etlx::ports::host::StderrLogSink sink;
+    etlx::log::SetSink(&sink);
+
     // Bind a loopback listener and start the mTLS-requiring server.
     int listen_fd = ::socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in addr{};
@@ -110,16 +114,16 @@ int main() {
 
     int rc = 1;
     if (auto s = tls.Configure(cfg); !s) {
-        std::printf("configure failed: %s\n", s.error().message.c_str());
+        ETLX_LOG_ERROR("configure failed: %s", s.error().message.c_str());
     } else if (auto c = tls.Connect("127.0.0.1", port); !c) {
-        std::printf("handshake failed: %s\n", c.error().message.c_str());
+        ETLX_LOG_ERROR("handshake failed: %s", c.error().message.c_str());
     } else {
-        std::printf("mutual TLS handshake OK (presented client cert)\n");
+        ETLX_LOG_INFO("mutual TLS handshake OK (presented client cert)");
         const char* msg = "GET /manifest over mTLS";
         tls.Send(etlx::ConstByteSpan{reinterpret_cast<const uint8_t*>(msg), std::strlen(msg)});
         uint8_t buf[128];
         if (auto n = tls.Recv(etlx::ByteSpan{buf, sizeof(buf)}); n && n.value() > 0) {
-            std::printf("server echoed: %.*s\n", static_cast<int>(n.value()), buf);
+            ETLX_LOG_INFO("server echoed: %.*s", static_cast<int>(n.value()), buf);
             rc = 0;
         }
         tls.Close();

@@ -1,11 +1,11 @@
-// Example: define a 2-command CliApp, parse argv, and print help.
-// Build target: example_cli_minimal. Try:
+// Example: define a 2-command CliApp, parse argv, and print help. Help is
+// rendered with conf::PrintCliHelp into an io::Writer; other output uses
+// etlx::log. Build target: example_cli_minimal. Try:
 //   example_cli_minimal --help
 //   example_cli_minimal greet --loud world
 #include "etlx/conf/cli.hpp"
+#include "etlx/log/log.hpp"
 #include "host/host_io.hpp"
-
-#include <cstdio>
 
 namespace conf = etlx::conf;
 
@@ -34,8 +34,11 @@ conf::CliApp BuildApp() {
 } // namespace
 
 int main(int argc, char** argv) {
+    static etlx::ports::host::StderrLogSink sink;
+    etlx::log::SetSink(&sink);
+
     const conf::CliApp app = BuildApp();
-    etlx::ports::host::FileWriter out;  // stdout
+    etlx::ports::host::FileWriter out;  // stdout, for rendered help
 
     if (argc < 2) {
         conf::PrintCliHelp(app, out);
@@ -45,7 +48,7 @@ int main(int argc, char** argv) {
     const etl::string_view cmd_name{argv[1]};
     const conf::CliCommand* cmd = conf::FindCommand(app, cmd_name);
     if (cmd == nullptr) {
-        std::printf("unknown command: %s\n\n", argv[1]);
+        ETLX_LOG_ERROR("unknown command: %s", argv[1]);
         conf::PrintCliHelp(app, out);
         return 1;
     }
@@ -56,7 +59,7 @@ int main(int argc, char** argv) {
     for (;;) {
         auto next = it.Next();
         if (!next) {
-            std::printf("parse error: %s\n", next.error().message.c_str());
+            ETLX_LOG_ERROR("parse error: %s", next.error().message.c_str());
             return 1;
         }
         if (!next.value().has_value()) break;
@@ -66,10 +69,10 @@ int main(int argc, char** argv) {
     }
 
     if (cmd_name == "version") {
-        std::printf("minimal 1.0.0\n");
+        ETLX_LOG_INFO("minimal 1.0.0");
     } else {  // greet
-        std::printf(loud ? "HELLO, %.*s!\n" : "hello, %.*s\n",
-                    static_cast<int>(name.size()), name.data());
+        ETLX_LOG_INFO(loud ? "HELLO, %.*s!" : "hello, %.*s",
+                      static_cast<int>(name.size()), name.data());
     }
     return 0;
 }

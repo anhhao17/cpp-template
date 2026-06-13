@@ -1,12 +1,16 @@
 // Example: stream bytes through fixed buffers with the io Reader/Writer model,
 // fanning the same data into two sinks via TeeWriter while a CountingWriter
-// totals it. Build target: example_io_copy.
+// totals it. Output via etlx::log. Build target: example_io_copy.
 #include "etlx/io/io.hpp"
+#include "etlx/log/log.hpp"
+#include "host/host_io.hpp"
 
 #include <cstdint>
-#include <cstdio>
 
 int main() {
+    static etlx::ports::host::StderrLogSink sink;
+    etlx::log::SetSink(&sink);
+
     const char* msg = "stream me through fixed buffers without a heap";
     etlx::io::SpanReader reader(etlx::ConstByteSpan{
         reinterpret_cast<const uint8_t*>(msg), __builtin_strlen(msg)});
@@ -21,11 +25,10 @@ int main() {
     auto copied = etlx::io::Copy(reader, tee, etlx::ByteSpan{scratch, sizeof(scratch)});
 
     if (!copied) {
-        std::printf("copy failed: %s\n", copied.error().message.c_str());
+        ETLX_LOG_ERROR("copy failed: %s", copied.error().message.c_str());
         return 1;
     }
-    std::printf("copied %zu bytes (counter saw %zu)\n", copied.value(),
-                counter.count());
-    std::printf("dest: %.*s\n", static_cast<int>(dest.written()), out_buf);
+    ETLX_LOG_INFO("copied %zu bytes (counter saw %zu)", copied.value(), counter.count());
+    ETLX_LOG_INFO("dest: %.*s", static_cast<int>(dest.written()), out_buf);
     return 0;
 }

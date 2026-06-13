@@ -72,12 +72,15 @@ target_compile_options(etlx_simw PRIVATE -w)
 # Phase 0: se05x_probe.cpp (build-spike TU, verifies SSS headers link)
 # Phase 1: se_connection.cpp (Connection RAII), se_random.cpp (SeRandom)
 # Phase 2: rsa_key.cpp (RSA generate/open/sign/CSR), object_store.cpp (cert/blob)
+# Phase 3: scp03.cpp (GP PUT KEY rotation), scp03_keyfile.cpp (key file I/O)
 add_library(etlx_se05x STATIC
   se05x_probe.cpp
   se_connection.cpp
   se_random.cpp
   rsa_key.cpp
   object_store.cpp
+  scp03.cpp
+  scp03_keyfile.cpp
 )
 add_library(etlx::se05x ALIAS etlx_se05x)
 target_include_directories(etlx_se05x PUBLIC ${CMAKE_SOURCE_DIR}/include)

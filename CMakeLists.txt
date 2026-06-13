@@ -108,6 +108,10 @@ if(ETLX_BUILD_DEMOCLI)
   add_subdirectory(apps/democli)
 endif()
 
+if(ETLX_WITH_SE05X)
+  add_subdirectory(apps/se_factory)
+endif()
+
 if(ETLX_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif()

@@ -41,19 +41,33 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            simulators/SE050Sim/se050-sim/target
-          key: ${{ runner.os }}-se050-sim-${{ hashFiles('simulators/SE050Sim/se050-sim/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-se050-sim-
+          key: ${{ runner.os }}-se050-sim-cargo
+          restore-keys: ${{ runner.os }}-se050-sim-cargo
       - name: Clone wolfSSL SE050 simulator
+        # Clone into wolfssl-sim/ (not simulators/ — our repo uses that dir).
         run: |
-          git clone --depth 1 https://github.com/wolfSSL/simulators simulators
+          git clone --depth 1 https://github.com/wolfSSL/simulators wolfssl-sim
+      - name: Apply etlx patches to simulator
+        run: |
+          # UID pre-provisioning: real chips have 0x7FFF0206 pre-burned;
+          # the upstream simulator starts empty so GetUid() tests would fail.
+          cp simulators/se050-sim-patches/bin/tcp_server.rs \
+             wolfssl-sim/SE050Sim/se050-sim/src/bin/tcp_server.rs
+          # nxp-se050/se050 is a dev-dependency path that is not present in the
+          # shallow clone (it lives outside se050-sim/ in the repo tree).  Create
+          # a minimal stub so Cargo can resolve the path without checking it out.
+          mkdir -p wolfssl-sim/SE050Sim/nxp-se050/se050/src
+          printf '[package]\nname = "se050"\nversion = "0.0.1"\nedition = "2021"\n' \
+            > wolfssl-sim/SE050Sim/nxp-se050/se050/Cargo.toml
+          printf 'pub fn stub() {}' \
+            > wolfssl-sim/SE050Sim/nxp-se050/se050/src/lib.rs
       - name: Build tcp_server
         run: |
-          cd simulators/SE050Sim/se050-sim
+          cd wolfssl-sim/SE050Sim/se050-sim
           cargo build --release --bin tcp_server
       - name: Start simulator in background
         run: |
-          simulators/SE050Sim/se050-sim/target/release/tcp_server &
+          wolfssl-sim/SE050Sim/se050-sim/target/release/tcp_server &
           echo "SIM_PID=$!" >> $GITHUB_ENV
           # Wait until port 8050 is accepting connections (up to 10s).
           for i in $(seq 1 20); do
